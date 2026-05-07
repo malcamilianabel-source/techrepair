@@ -123,20 +123,17 @@ AUTH_USER_MODEL = 'core.Usuario'
 import os
 import dj_database_url
 
-# Whitenoise para archivos estáticos
 MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-# Base de datos desde variable de entorno
-DATABASE_URL = os.environ.get('DATABASE_URL')
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
 if DATABASE_URL:
-    DATABASES['default'] = dj_database_url.config(
-        default=DATABASE_URL,
-        conn_max_age=600
-    )
+    # Convertir postgresql:// a postgres:// para compatibilidad
+    DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgres://')
+    DATABASES['default'] = dj_database_url.parse(
+        DATABASE_URL, conn_max_age=600)
 
-# Seguridad
 ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = ['https://web-production-1ce30.up.railway.app']
 SECRET_KEY = os.environ.get('SECRET_KEY', SECRET_KEY)
