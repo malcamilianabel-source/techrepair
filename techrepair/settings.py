@@ -135,4 +135,5 @@ if DATABASE_URL:
 
 # Seguridad
 ALLOWED_HOSTS = ['*']
+CSRF_TRUSTED_ORIGINS = ['https://web-production-1ce30.up.railway.app']
 SECRET_KEY = os.environ.get('SECRET_KEY', SECRET_KEY)
