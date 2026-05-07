@@ -1,0 +1,129 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / <span>Panel de Control</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
+      <i class="bi bi-grid-1x2-fill"></i>
+    </div>
+    Panel de Control
+  </div>
+  <div class="ps">Vista general del taller · {{ request.user.get_rol_display }}</div>
+</div>
+
+<!-- ESTADÍSTICAS -->
+<div class="grid4">
+  <div class="stat b">
+    <div class="sl">Solicitudes activas</div>
+    <div class="sv b">{{ total_solicitudes }}</div>
+    <div class="ss">Total registradas</div>
+    <i class="bi bi-file-earmark-text si"></i>
+  </div>
+  <div class="stat o">
+    <div class="sl">Pendientes</div>
+    <div class="sv o">{{ pendientes }}</div>
+    <div class="ss">Sin técnico asignado</div>
+    <i class="bi bi-hourglass-split si"></i>
+  </div>
+  <div class="stat b">
+    <div class="sl">En proceso</div>
+    <div class="sv b">{{ en_proceso }}</div>
+    <div class="ss">En reparación</div>
+    <i class="bi bi-gear si"></i>
+  </div>
+  <div class="stat g">
+    <div class="sl">Finalizadas</div>
+    <div class="sv g">{{ finalizadas }}</div>
+    <div class="ss">Completadas</div>
+    <i class="bi bi-check-circle si"></i>
+  </div>
+</div>
+
+<!-- TABLA Y TÉCNICOS -->
+<div class="two">
+  <div class="card">
+    <div class="ct">Solicitudes recientes</div>
+    {% if recientes %}
+    <div class="tw">
+      <table>
+        <thead>
+          <tr>
+            <th>Código</th>
+            <th>Cliente</th>
+            <th>Equipo</th>
+            <th>Estado</th>
+            <th>Prioridad</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for sol in recientes %}
+          <tr>
+            <td><strong class="mono acc">#S-{{ sol.id }}</strong></td>
+            <td><strong>{{ sol.cliente.nombre }}</strong></td>
+            <td>{{ sol.equipo.marca }} {{ sol.equipo.modelo }}</td>
+            <td>
+              {% if sol.estado == 'pendiente' %}
+                <span class="badge bp">Pendiente</span>
+              {% elif sol.estado == 'proceso' %}
+                <span class="badge bpr">En proceso</span>
+              {% elif sol.estado == 'finalizado' %}
+                <span class="badge bf">Finalizado</span>
+              {% else %}
+                <span class="badge">{{ sol.get_estado_display }}</span>
+              {% endif %}
+            </td>
+            <td>
+              {% if sol.prioridad == 'alta' %}
+                <span class="badge bh">Alta</span>
+              {% elif sol.prioridad == 'media' %}
+                <span class="badge bm">Media</span>
+              {% else %}
+                <span class="badge bl">Baja</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:30px;color:var(--t3);">
+      <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+      No hay solicitudes registradas aún.
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="ct">Técnicos del taller</div>
+    {% if tecnicos %}
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      {% for tec in tecnicos %}
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="width:32px;height:32px;border-radius:50%;
+          background:linear-gradient(135deg,var(--accent),var(--teal));
+          display:flex;align-items:center;justify-content:center;
+          font-size:.75rem;font-weight:700;flex-shrink:0;">
+          {{ tec.username|first|upper }}
+        </div>
+        <div>
+          <div style="font-size:.83rem;font-weight:600;">
+            {{ tec.get_full_name|default:tec.username }}
+          </div>
+          <div style="font-size:.72rem;color:var(--t3);">Técnico</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:30px;color:var(--t3);">
+      <i class="bi bi-people" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+      No hay técnicos registrados aún.
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

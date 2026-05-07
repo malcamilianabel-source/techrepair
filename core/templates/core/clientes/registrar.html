@@ -1,0 +1,55 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Registrar Cliente{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / Clientes / <span>Registrar Cliente</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--tg);color:var(--teal);">
+      <i class="bi bi-person-badge-fill"></i>
+    </div>
+    Registrar Nuevo Cliente
+  </div>
+  <div class="ps">Ingresa los datos del cliente para registrarlo en el sistema</div>
+</div>
+
+<div class="card" style="max-width:620px;">
+  <div class="ct">Datos del cliente</div>
+  <form method="POST">
+    {% csrf_token %}
+    <div class="grid2">
+      {% for field in form %}
+      <div class="fg {% if forloop.last %}span2{% endif %}">
+        <label class="fl">
+          {{ field.label }}
+          {% if field.field.required %}
+            <span style="color:var(--danger);">*</span>
+          {% endif %}
+        </label>
+        {{ field }}
+        {% if field.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">
+          {{ field.errors|join:", " }}
+        </span>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    <div style="display:flex;gap:8px;margin-top:18px;
+      padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn btn-p" type="submit">
+        <i class="bi bi-person-check-fill"></i> Guardar Cliente
+      </button>
+      <a href="{% url 'consultar_clientes' %}" class="btn btn-o">
+        <i class="bi bi-x"></i> Cancelar
+      </a>
+    </div>
+  </form>
+</div>
+
+<style>
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.span2{grid-column:span 2;}
+</style>
+{% endblock %}

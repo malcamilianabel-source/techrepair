@@ -1,0 +1,105 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Diagnóstico — #S-{{ solicitud.id }}{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / Solicitudes / <span>Diagnóstico #S-{{ solicitud.id }}</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
+      <i class="bi bi-clipboard2-pulse-fill"></i>
+    </div>
+    Registrar Diagnóstico Técnico
+  </div>
+  <div class="ps">Solicitud <strong class="acc">#S-{{ solicitud.id }}</strong>
+    — {{ solicitud.cliente.nombre }} — {{ solicitud.equipo.get_marca_display }} {{ solicitud.equipo.modelo }}</div>
+</div>
+
+<div class="two">
+  <!-- FORMULARIO -->
+  <div class="card">
+    <div class="ct">Diagnóstico técnico</div>
+    <form method="POST">
+      {% csrf_token %}
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="fg">
+          <label class="fl">Fallas detectadas <span style="color:var(--danger);">*</span></label>
+          {{ form.diagnostico }}
+          {% if form.diagnostico.errors %}
+          <span style="color:var(--danger);font-size:.72rem;">{{ form.diagnostico.errors|join:", " }}</span>
+          {% endif %}
+        </div>
+        <div class="fg">
+          <label class="fl">Componentes afectados</label>
+          {{ form.componentes }}
+        </div>
+        <div class="fg">
+          <label class="fl">Causa probable</label>
+          {{ form.causa_probable }}
+        </div>
+        <div class="fg">
+          <label class="fl">Trabajo realizado</label>
+          {{ form.trabajo_realizado }}
+        </div>
+        <div class="fg">
+          <label class="fl">Recomendaciones para el cliente</label>
+          {{ form.recomendaciones }}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:18px;
+        padding-top:16px;border-top:1px solid var(--border);">
+        <button class="btn btn-p" type="submit">
+          <i class="bi bi-clipboard2-check-fill"></i> Guardar Diagnóstico
+        </button>
+        <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-o">
+          <i class="bi bi-arrow-left"></i> Volver
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <!-- INFO SOLICITUD -->
+  <div class="card">
+    <div class="ct">Información del equipo</div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <div class="di">
+        <div class="dl">Equipo</div>
+        <div class="dv">{{ solicitud.equipo.get_marca_display }} {{ solicitud.equipo.modelo }}</div>
+      </div>
+      <div class="di">
+        <div class="dl">Tipo</div>
+        <div class="dv">{{ solicitud.equipo.get_tipo_display }}</div>
+      </div>
+      <div class="di">
+        <div class="dl">Serie</div>
+        <div class="dv mono">{{ solicitud.equipo.serie }}</div>
+      </div>
+      <div class="di">
+        <div class="dl">Estado físico</div>
+        <div class="dv">{{ solicitud.equipo.get_estado_display }}</div>
+      </div>
+      <div class="di">
+        <div class="dl">Falla reportada por cliente</div>
+        <div class="dv">{{ solicitud.equipo.falla|default:"No especificada" }}</div>
+      </div>
+      <div class="di">
+        <div class="dl">Descripción del problema</div>
+        <div class="dv">{{ solicitud.descripcion }}</div>
+      </div>
+      {% if solicitud.observaciones %}
+      <div class="di">
+        <div class="dl">Observaciones del cliente</div>
+        <div class="dv">{{ solicitud.observaciones }}</div>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</div>
+
+<style>
+.di{background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--rs);padding:11px 14px;}
+.dl{font-size:.68rem;color:var(--t3);margin-bottom:3px;}
+.dv{font-size:.87rem;color:var(--t1);font-weight:500;}
+</style>
+{% endblock %}

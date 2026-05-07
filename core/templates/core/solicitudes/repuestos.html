@@ -1,0 +1,101 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Repuestos — #S-{{ solicitud.id }}{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / Solicitudes / <span>Repuestos #S-{{ solicitud.id }}</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--wg);color:var(--warn);">
+      <i class="bi bi-box-seam-fill"></i>
+    </div>
+    Repuestos Utilizados
+  </div>
+  <div class="ps">Solicitud <strong class="acc">#S-{{ solicitud.id }}</strong>
+    — {{ solicitud.cliente.nombre }}</div>
+</div>
+
+{% if messages %}
+{% for msg in messages %}
+<div style="background:var(--sg);border:1px solid rgba(61,214,140,.3);color:var(--success);
+  padding:10px 14px;border-radius:var(--rs);font-size:.82rem;
+  display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+  <i class="bi bi-check-circle-fill"></i> {{ msg }}
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="two">
+  <!-- FORMULARIO -->
+  <div class="card">
+    <div class="ct">Agregar repuesto</div>
+    <form method="POST">
+      {% csrf_token %}
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="fg">
+          <label class="fl">Nombre del repuesto <span style="color:var(--danger);">*</span></label>
+          <input class="fc" type="text" name="nombre"
+            placeholder="Ej: Panel LCD 15.6, RAM DDR4 8GB...">
+        </div>
+        <div class="fg">
+          <label class="fl">Cantidad <span style="color:var(--danger);">*</span></label>
+          <input class="fc" type="number" name="cantidad" value="1" min="1">
+        </div>
+        <div class="fg">
+          <label class="fl">Precio unitario (S/.) <span style="color:var(--danger);">*</span></label>
+          <input class="fc" type="number" name="precio_unit"
+            step="0.01" placeholder="0.00">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:18px;
+        padding-top:16px;border-top:1px solid var(--border);">
+        <button class="btn btn-w" type="submit"
+          style="background:var(--warn);color:#0b0d12;">
+          <i class="bi bi-plus-circle"></i> Agregar Repuesto
+        </button>
+        <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-o">
+          <i class="bi bi-arrow-left"></i> Volver
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <!-- LISTA DE REPUESTOS -->
+  <div class="card">
+    <div class="ct">Repuestos registrados</div>
+    {% if repuestos %}
+    <div style="display:flex;flex-direction:column;gap:0;">
+      {% for rep in repuestos %}
+      <div style="display:flex;justify-content:space-between;align-items:center;
+        padding:10px 0;border-bottom:1px solid var(--border);">
+        <div>
+          <div style="font-size:.85rem;font-weight:600;color:var(--t1);">{{ rep.nombre }}</div>
+          <div style="font-size:.72rem;color:var(--t3);">{{ rep.cantidad }} unidad(es)</div>
+        </div>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.9rem;
+          font-weight:700;color:var(--t1);">S/. {{ rep.subtotal }}</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;
+      padding:14px;background:var(--ag);border:1px solid rgba(91,141,238,.25);
+      border-radius:var(--rs);margin-top:12px;">
+      <span style="font-weight:700;">Total repuestos</span>
+      <span style="font-family:'JetBrains Mono',monospace;color:var(--teal);font-size:1.05rem;">
+        S/. {% for rep in repuestos %}{{ rep.subtotal }}{% if not forloop.last %} + {% endif %}{% endfor %}
+      </span>
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:30px;color:var(--t3);">
+      <i class="bi bi-box" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+      No hay repuestos registrados aún.
+    </div>
+    {% endif %}
+    <div style="margin-top:16px;">
+      <a href="{% url 'costos' solicitud.pk %}" class="btn btn-p" style="width:100%;justify-content:center;">
+        <i class="bi bi-currency-dollar"></i> Ver Costos Totales
+      </a>
+    </div>
+  </div>
+</div>
+{% endblock %}

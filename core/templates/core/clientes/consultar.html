@@ -1,0 +1,96 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Consultar Clientes{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / Clientes / <span>Consultar Clientes</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
+      <i class="bi bi-person-lines-fill"></i>
+    </div>
+    Clientes Registrados
+  </div>
+  <div class="ps">Busca y gestiona los clientes del taller</div>
+</div>
+
+{% if messages %}
+{% for msg in messages %}
+<div style="background:var(--sg);border:1px solid rgba(61,214,140,.3);color:var(--success);
+  padding:10px 14px;border-radius:var(--rs);font-size:.82rem;
+  display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+  <i class="bi bi-check-circle-fill"></i> {{ msg }}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- BUSCADOR -->
+<form method="GET" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+  <div style="position:relative;flex:1;max-width:360px;">
+    <i class="bi bi-search" style="position:absolute;left:10px;top:50%;
+      transform:translateY(-50%);color:var(--t3);font-size:.85rem;"></i>
+    <input class="fc" type="text" name="q" value="{{ query }}"
+      placeholder="Buscar por nombre, DNI o teléfono..."
+      style="padding-left:32px;">
+  </div>
+  <button class="btn btn-p btn-sm" type="submit">
+    <i class="bi bi-search"></i> Buscar
+  </button>
+  <a href="{% url 'registrar_cliente' %}" class="btn btn-p" style="margin-left:auto;">
+    <i class="bi bi-person-plus-fill"></i> Nuevo Cliente
+  </a>
+</form>
+
+<!-- TABLA -->
+<div class="card">
+  <div class="tw">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nombre</th>
+          <th>DNI</th>
+          <th>Teléfono</th>
+          <th>Correo</th>
+          <th>Equipos</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for cliente in clientes %}
+        <tr>
+          <td><strong class="mono acc">#C{{ cliente.id }}</strong></td>
+          <td><strong>{{ cliente.nombre }}</strong></td>
+          <td class="mono">{{ cliente.dni }}</td>
+          <td>{{ cliente.telefono }}</td>
+          <td>{{ cliente.correo|default:"—" }}</td>
+          <td>
+            <span style="background:var(--surface);border:1px solid var(--border);
+              border-radius:20px;padding:2px 10px;font-size:.72rem;color:var(--t2);">
+              {{ cliente.equipos.count }} equipo(s)
+            </span>
+          </td>
+          <td style="display:flex;gap:6px;">
+            <a href="{% url 'actualizar_cliente' cliente.pk %}"
+              class="btn btn-o btn-sm">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" style="text-align:center;padding:30px;color:var(--t3);">
+            <i class="bi bi-person-slash" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+            {% if query %}
+              No se encontraron clientes con "{{ query }}"
+            {% else %}
+              No hay clientes registrados aún.
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

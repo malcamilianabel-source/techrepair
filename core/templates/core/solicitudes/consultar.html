@@ -1,0 +1,144 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Consultar Solicitudes{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / Solicitudes / <span>Consultar Solicitudes</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
+      <i class="bi bi-card-list"></i>
+    </div>
+    Solicitudes Registradas
+  </div>
+  <div class="ps">Gestiona y filtra todas las órdenes de servicio</div>
+</div>
+
+{% if messages %}
+{% for msg in messages %}
+<div style="background:var(--sg);border:1px solid rgba(61,214,140,.3);color:var(--success);
+  padding:10px 14px;border-radius:var(--rs);font-size:.82rem;
+  display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+  <i class="bi bi-check-circle-fill"></i> {{ msg }}
+</div>
+{% endfor %}
+{% endif %}
+
+<!-- FILTROS -->
+<form method="GET" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+  <div style="position:relative;flex:1;max-width:300px;">
+    <i class="bi bi-search" style="position:absolute;left:10px;top:50%;
+      transform:translateY(-50%);color:var(--t3);font-size:.85rem;"></i>
+    <input class="fc" type="text" name="q" value="{{ q }}"
+      placeholder="Buscar por cliente..." style="padding-left:32px;">
+  </div>
+  <select class="fc" name="estado" style="width:140px;">
+    <option value="">Todos los estados</option>
+    <option value="pendiente"  {% if estado == 'pendiente'  %}selected{% endif %}>Pendiente</option>
+    <option value="proceso"    {% if estado == 'proceso'    %}selected{% endif %}>En proceso</option>
+    <option value="finalizado" {% if estado == 'finalizado' %}selected{% endif %}>Finalizado</option>
+    <option value="entregado"  {% if estado == 'entregado'  %}selected{% endif %}>Entregado</option>
+  </select>
+  <select class="fc" name="prioridad" style="width:130px;">
+    <option value="">Todas las prioridades</option>
+    <option value="alta"  {% if prioridad == 'alta'  %}selected{% endif %}>Alta</option>
+    <option value="media" {% if prioridad == 'media' %}selected{% endif %}>Media</option>
+    <option value="baja"  {% if prioridad == 'baja'  %}selected{% endif %}>Baja</option>
+  </select>
+  <button class="btn btn-p btn-sm" type="submit">
+    <i class="bi bi-funnel"></i> Filtrar
+  </button>
+  {% if request.user.rol != 'tec' %}
+<a href="{% url 'registrar_solicitud' %}" class="btn btn-p" style="margin-left:auto;">
+  <i class="bi bi-plus-lg"></i> Nueva Solicitud
+</a>
+{% endif %}
+</form>
+
+<!-- TABLA -->
+<div class="card">
+  <div class="tw">
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Cliente</th>
+          <th>Equipo</th>
+          <th>Tipo</th>
+          <th>Técnico</th>
+          <th>Prioridad</th>
+          <th>Estado</th>
+          <th>T. Estimado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sol in solicitudes %}
+        <tr>
+          <td><strong class="mono acc">#S-{{ sol.id }}</strong></td>
+          <td><strong>{{ sol.cliente.nombre }}</strong></td>
+          <td>{{ sol.equipo.get_marca_display }} {{ sol.equipo.modelo }}</td>
+          <td>{{ sol.get_tipo_reparacion_display|default:"—" }}</td>
+          <td>
+            {% if sol.detalle.tecnico %}
+              {{ sol.detalle.tecnico.get_full_name|default:sol.detalle.tecnico.username }}
+            {% else %}
+              <span style="color:var(--t3);">Sin asignar</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if sol.prioridad == 'alta' %}
+              <span class="badge bh">Alta</span>
+            {% elif sol.prioridad == 'media' %}
+              <span class="badge bm">Media</span>
+            {% else %}
+              <span class="badge bl">Baja</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if sol.estado == 'pendiente' %}
+              <span class="badge bp">Pendiente</span>
+            {% elif sol.estado == 'proceso' %}
+              <span class="badge bpr">En proceso</span>
+            {% elif sol.estado == 'finalizado' %}
+              <span class="badge bf">Finalizado</span>
+            {% else %}
+              <span class="badge">{{ sol.get_estado_display }}</span>
+            {% endif %}
+          </td>
+          <td class="mono">
+               {% if sol.tiempo_estimado_texto %}
+             <span style="color:var(--accent);">{{ sol.tiempo_estimado_texto }}</span>
+              {% else %}—{% endif %}
+           </td>
+          <td style="display:flex;gap:4px;">
+  <a href="{% url 'detalle_solicitud' sol.pk %}"
+    class="btn btn-o btn-sm" title="Ver detalle">
+    <i class="bi bi-eye"></i>
+  </a>
+  {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
+  <a href="{% url 'asignar_tecnico' sol.pk %}"
+    class="btn btn-o btn-sm" title="Asignar técnico">
+    <i class="bi bi-person-check"></i>
+  </a>
+  {% endif %}
+  {% if request.user.rol == 'admin' or request.user.rol == 'tec' %}
+  <a href="{% url 'cambiar_estado' sol.pk %}"
+    class="btn btn-o btn-sm" title="Cambiar estado">
+    <i class="bi bi-arrow-repeat"></i>
+  </a>
+  {% endif %}
+</td>
+        {% empty %}
+        <tr>
+          <td colspan="9" style="text-align:center;padding:30px;color:var(--t3);">
+            <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+            No hay solicitudes registradas aún.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,87 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Actualizar Cliente{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / Clientes / <span>Actualizar Cliente</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--wg);color:var(--warn);">
+      <i class="bi bi-pencil-square"></i>
+    </div>
+    Actualizar Datos del Cliente
+  </div>
+  <div class="ps">Modifica la información de un cliente existente</div>
+</div>
+
+<div class="card" style="max-width:620px;">
+  <div class="alert al-i" style="margin-bottom:16px;">
+    <i class="bi bi-person-fill"></i>
+    Editando: <strong>{{ cliente.nombre }}</strong> — DNI: {{ cliente.dni }}
+  </div>
+
+  <div class="ct">Datos editables</div>
+  <form method="POST">
+    {% csrf_token %}
+    <div class="grid2">
+      <div class="fg">
+        <label class="fl">Nombre completo</label>
+        {{ form.nombre }}
+        {% if form.nombre.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">
+          {{ form.nombre.errors|join:", " }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="fg">
+        <label class="fl">DNI <small style="color:var(--t3);">(no editable)</small></label>
+        <input class="fc" value="{{ cliente.dni }}" disabled
+          style="opacity:.4;cursor:not-allowed;">
+      </div>
+      <div class="fg">
+        <label class="fl">Teléfono</label>
+        {{ form.telefono }}
+        {% if form.telefono.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">
+          {{ form.telefono.errors|join:", " }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="fg">
+        <label class="fl">Correo electrónico</label>
+        {{ form.correo }}
+        {% if form.correo.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">
+          {{ form.correo.errors|join:", " }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="fg" style="grid-column:span 2;">
+        <label class="fl">Dirección</label>
+        {{ form.direccion }}
+        {% if form.direccion.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">
+          {{ form.direccion.errors|join:", " }}
+        </span>
+        {% endif %}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:18px;
+      padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn btn-p" type="submit">
+        <i class="bi bi-check-circle-fill"></i> Guardar Cambios
+      </button>
+      <a href="{% url 'consultar_clientes' %}" class="btn btn-o">
+        <i class="bi bi-arrow-left"></i> Volver
+      </a>
+    </div>
+  </form>
+</div>
+
+<style>
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+.al-i{background:var(--ag);border:1px solid rgba(91,141,238,.3);
+  color:var(--accent);padding:10px 14px;border-radius:var(--rs);
+  font-size:.82rem;display:flex;align-items:center;gap:8px;}
+</style>
+{% endblock %}

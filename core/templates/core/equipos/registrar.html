@@ -1,0 +1,84 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Registrar Equipo{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / Equipos / <span>Registrar Equipo</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
+      <i class="bi bi-laptop-fill"></i>
+    </div>
+    Registrar Nuevo Equipo
+  </div>
+  <div class="ps">Ingresa las características del equipo y asócialo a un cliente</div>
+</div>
+
+<div class="card" style="max-width:700px;">
+  <div class="ct">Especificaciones del equipo</div>
+  <form method="POST">
+    {% csrf_token %}
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
+      <div class="fg">
+        <label class="fl">Tipo de equipo <span style="color:var(--danger);">*</span></label>
+        {{ form.tipo }}
+        {% if form.tipo.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.tipo.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+      <div class="fg">
+        <label class="fl">Marca <span style="color:var(--danger);">*</span></label>
+        {{ form.marca }}
+        {% if form.marca.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.marca.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+      <div class="fg">
+        <label class="fl">Modelo <span style="color:var(--danger);">*</span></label>
+        {{ form.modelo }}
+        {% if form.modelo.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.modelo.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+      <div class="fg">
+        <label class="fl">Número de serie <span style="color:var(--danger);">*</span></label>
+        {{ form.serie }}
+        <span class="fh" style="font-size:.7rem;color:var(--t3);">Se verifica duplicados</span>
+        {% if form.serie.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.serie.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+      <div class="fg">
+        <label class="fl">Estado físico</label>
+        {{ form.estado }}
+        {% if form.estado.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.estado.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+      <div class="fg">
+        <label class="fl">Cliente propietario <span style="color:var(--danger);">*</span></label>
+        {{ form.cliente }}
+        {% if form.cliente.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.cliente.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+      <div class="fg" style="grid-column:span 3;">
+        <label class="fl">Falla reportada</label>
+        {{ form.falla }}
+        {% if form.falla.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.falla.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:18px;
+      padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn btn-p" type="submit">
+        <i class="bi bi-hdd-fill"></i> Registrar Equipo
+      </button>
+      <a href="{% url 'consultar_equipos' %}" class="btn btn-o">
+        <i class="bi bi-x"></i> Cancelar
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,99 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Avance — #S-{{ solicitud.id }}{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / Solicitudes / <span>Avance #S-{{ solicitud.id }}</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--tg);color:var(--teal);">
+      <i class="bi bi-journal-text"></i>
+    </div>
+    Bitácora de Avances
+  </div>
+  <div class="ps">Solicitud <strong class="acc">#S-{{ solicitud.id }}</strong>
+    — {{ solicitud.cliente.nombre }} — {{ solicitud.equipo.get_marca_display }} {{ solicitud.equipo.modelo }}</div>
+</div>
+
+<div class="two">
+  <!-- FORMULARIO -->
+  <div class="card">
+    <div class="ct">Registrar nuevo avance</div>
+    <form method="POST">
+      {% csrf_token %}
+      <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="fg">
+          <label class="fl">Etapa <span style="color:var(--danger);">*</span></label>
+          {{ form.etapa }}
+          {% if form.etapa.errors %}
+          <span style="color:var(--danger);font-size:.72rem;">{{ form.etapa.errors|join:", " }}</span>
+          {% endif %}
+        </div>
+        <div class="fg">
+          <label class="fl">Descripción <span style="color:var(--danger);">*</span></label>
+          {{ form.descripcion }}
+          {% if form.descripcion.errors %}
+          <span style="color:var(--danger);font-size:.72rem;">{{ form.descripcion.errors|join:", " }}</span>
+          {% endif %}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:18px;
+        padding-top:16px;border-top:1px solid var(--border);">
+        <button class="btn btn-t" type="submit"
+          style="background:var(--teal);color:#0b0d12;">
+          <i class="bi bi-journal-plus"></i> Registrar Avance
+        </button>
+        <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-o">
+          <i class="bi bi-arrow-left"></i> Volver
+        </a>
+      </div>
+    </form>
+  </div>
+
+  <!-- BITÁCORA -->
+  <div class="card">
+    <div class="ct">Historial de avances ({{ avances.count }})</div>
+    {% if avances %}
+    <div class="tl">
+      {% for av in avances %}
+      <div class="tl-item">
+        <div class="tl-l">
+          <div class="tl-dot {% if forloop.last %}act{% else %}done{% endif %}"></div>
+          {% if not forloop.last %}<div class="tl-con"></div>{% endif %}
+        </div>
+        <div class="tl-c">
+          <div class="tl-t">{{ av.get_etapa_display }}</div>
+          <div class="tl-m">
+            {{ av.fecha_hora|date:"d/m/Y H:i" }} —
+            {{ av.usuario.get_full_name|default:av.usuario.username }}
+          </div>
+          <div class="tl-d">{{ av.descripcion }}</div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:30px;color:var(--t3);">
+      <i class="bi bi-journal" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+      No hay avances registrados aún.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+.tl{display:flex;flex-direction:column;gap:0;}
+.tl-item{display:flex;gap:14px;padding-bottom:18px;}
+.tl-item:last-child{padding-bottom:0;}
+.tl-l{display:flex;flex-direction:column;align-items:center;}
+.tl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px;border:2px solid var(--card);}
+.tl-dot.done{background:var(--success);}
+.tl-dot.act{background:var(--teal);}
+.tl-con{width:2px;background:var(--border);flex:1;margin-top:4px;}
+.tl-c{flex:1;}
+.tl-t{font-size:.82rem;font-weight:600;color:var(--t1);}
+.tl-m{font-size:.72rem;color:var(--t3);margin-top:2px;}
+.tl-d{font-size:.79rem;color:var(--t2);margin-top:6px;padding:8px 11px;
+  background:var(--surface);border-radius:var(--rs);border-left:2px solid var(--teal);}
+</style>
+{% endblock %}

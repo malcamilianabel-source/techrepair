@@ -1,0 +1,88 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Costos — #S-{{ solicitud.id }}{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / Solicitudes / <span>Costos #S-{{ solicitud.id }}</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--sg);color:var(--success);">
+      <i class="bi bi-currency-dollar"></i>
+    </div>
+    Costo de Reparación
+  </div>
+  <div class="ps">Solicitud <strong class="acc">#S-{{ solicitud.id }}</strong>
+    — {{ solicitud.cliente.nombre }}</div>
+</div>
+
+{% if messages %}
+{% for msg in messages %}
+<div style="background:var(--sg);border:1px solid rgba(61,214,140,.3);color:var(--success);
+  padding:10px 14px;border-radius:var(--rs);font-size:.82rem;
+  display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+  <i class="bi bi-check-circle-fill"></i> {{ msg }}
+</div>
+{% endfor %}
+{% endif %}
+
+<div class="card" style="max-width:500px;">
+  <div class="ct">Desglose de costos</div>
+  <form method="POST">
+    {% csrf_token %}
+    <div class="fg" style="margin-bottom:16px;">
+      <label class="fl">Mano de obra (S/.) <span style="color:var(--danger);">*</span></label>
+      <input class="fc" type="number" name="mano_obra"
+        step="0.01" value="{{ costo.mano_obra }}" placeholder="0.00">
+    </div>
+  </form>
+
+  <!-- DESGLOSE -->
+  <div style="display:flex;flex-direction:column;gap:0;margin-top:8px;">
+    <div style="display:flex;justify-content:space-between;
+      padding:10px 0;border-bottom:1px solid var(--border);">
+      <span style="font-size:.85rem;color:var(--t2);">Mano de obra</span>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:700;">
+        S/. {{ costo.mano_obra }}</span>
+    </div>
+    {% for rep in repuestos %}
+    <div style="display:flex;justify-content:space-between;
+      padding:10px 0;border-bottom:1px solid var(--border);">
+      <div>
+        <span style="font-size:.85rem;color:var(--t2);">{{ rep.nombre }}</span>
+        <span style="font-size:.72rem;color:var(--t3);margin-left:8px;">x{{ rep.cantidad }}</span>
+      </div>
+      <span style="font-family:'JetBrains Mono',monospace;font-weight:700;">
+        S/. {{ rep.subtotal }}</span>
+    </div>
+    {% endfor %}
+  </div>
+
+  <div style="display:flex;justify-content:space-between;align-items:center;
+    padding:14px;background:var(--ag);border:1px solid rgba(91,141,238,.25);
+    border-radius:var(--rs);margin-top:12px;">
+    <span style="font-weight:700;font-size:1rem;">Total a cobrar</span>
+    <span style="font-family:'JetBrains Mono',monospace;color:var(--teal);
+      font-size:1.2rem;font-weight:700;">S/. {{ costo.total }}</span>
+  </div>
+
+  <form method="POST" style="margin-top:16px;">
+    {% csrf_token %}
+    <div class="fg" style="margin-bottom:14px;">
+      <label class="fl">Actualizar mano de obra (S/.)</label>
+      <input class="fc" type="number" name="mano_obra"
+        step="0.01" value="{{ costo.mano_obra }}" placeholder="0.00">
+    </div>
+    <div style="display:flex;gap:8px;">
+      <button class="btn btn-s" type="submit">
+        <i class="bi bi-check-circle-fill"></i> Guardar Costo
+      </button>
+      <a href="{% url 'repuestos' solicitud.pk %}" class="btn btn-o">
+        <i class="bi bi-box-seam"></i> Ver Repuestos
+      </a>
+      <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-o">
+        <i class="bi bi-arrow-left"></i> Volver
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}

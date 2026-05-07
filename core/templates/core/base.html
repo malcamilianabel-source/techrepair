@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TechRepair — {% block title %}Sistema{% endblock %}</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+:root{
+  --bg:#0b0d12;--surface:#11141c;--card:#181c27;--hover:#1f2535;
+  --border:#252c3d;--border2:#2e3850;--accent:#5b8dee;
+  --ag:rgba(91,141,238,.15);--teal:#00c9a7;--tg:rgba(0,201,167,.12);
+  --warn:#f5a623;--wg:rgba(245,166,35,.12);--danger:#e8445a;
+  --dg:rgba(232,68,90,.12);--success:#3dd68c;--sg:rgba(61,214,140,.12);
+  --t1:#dde4f5;--t2:#7b87a8;--t3:#454f6b;--sw:230px;--nh:56px;--r:10px;--rs:6px;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;}
+::-webkit-scrollbar{width:4px;height:4px;}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px;}
+.nav{position:fixed;top:0;left:0;right:0;height:var(--nh);
+  background:rgba(11,13,18,.9);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;z-index:200;}
+.nav-logo{font-family:'JetBrains Mono',monospace;font-size:.95rem;
+  color:var(--accent);display:flex;align-items:center;gap:8px;
+  margin-left:calc(var(--sw) + 40px);}
+.pulse{width:7px;height:7px;background:var(--teal);border-radius:50%;animation:p 2s infinite;}
+@keyframes p{0%,100%{opacity:1}50%{opacity:.3;transform:scale(1.4)}}
+.nav-r{display:flex;align-items:center;gap:10px;margin-right:40px;}
+.role-chip{background:var(--ag);border:1px solid rgba(91,141,238,.3);
+  color:var(--accent);font-size:.72rem;padding:3px 10px;border-radius:20px;font-weight:600;}
+.avatar{width:32px;height:32px;border-radius:50%;
+  background:linear-gradient(135deg,var(--accent),var(--teal));
+  display:flex;align-items:center;justify-content:center;font-size:.78rem;font-weight:700;}
+.sb{position:fixed;top:var(--nh);left:0;bottom:0;width:var(--sw);
+  background:var(--surface);border-right:1px solid var(--border);
+  overflow-y:auto;z-index:190;padding:10px 0 20px;}
+.sb-sect{padding:14px 16px 4px;font-size:.6rem;font-family:'JetBrains Mono',monospace;
+  color:var(--t3);letter-spacing:2px;text-transform:uppercase;}
+.sb-item{display:flex;align-items:center;gap:9px;padding:8px 16px;cursor:pointer;
+  font-size:.82rem;color:var(--t2);transition:.12s;
+  border-left:2px solid transparent;text-decoration:none;}
+.sb-item:hover{background:var(--hover);color:var(--t1);}
+.sb-item.on{background:var(--ag);color:var(--accent);border-left-color:var(--accent);}
+.sb-item .bi{font-size:.95rem;width:18px;text-align:center;}
+.main{margin-left:var(--sw);padding-top:var(--nh);}
+.view{padding:24px 32px;min-height:calc(100vh - var(--nh));}
+.card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:20px;}
+.ct{font-size:.65rem;font-family:'JetBrains Mono',monospace;color:var(--t3);
+  letter-spacing:1.5px;text-transform:uppercase;margin-bottom:14px;}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:var(--r);
+  padding:16px 18px;position:relative;overflow:hidden;transition:.2s;}
+.stat::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.stat.b::before{background:var(--accent);}
+.stat.g::before{background:var(--success);}
+.stat.o::before{background:var(--warn);}
+.stat.r::before{background:var(--danger);}
+.sl{font-size:.72rem;color:var(--t3);margin-bottom:6px;}
+.sv{font-size:1.8rem;font-weight:700;font-family:'JetBrains Mono',monospace;line-height:1;}
+.sv.b{color:var(--accent)}.sv.g{color:var(--success)}.sv.o{color:var(--warn)}.sv.r{color:var(--danger)}
+.ss{font-size:.7rem;color:var(--t3);margin-top:5px;}
+.si{position:absolute;right:14px;top:50%;transform:translateY(-50%);font-size:1.8rem;opacity:.07;}
+.tw{overflow-x:auto;border-radius:var(--r);border:1px solid var(--border);}
+table{width:100%;border-collapse:collapse;}
+thead tr{background:var(--surface);border-bottom:1px solid var(--border);}
+th{padding:10px 14px;font-size:.67rem;font-family:'JetBrains Mono',monospace;
+  color:var(--t3);letter-spacing:1px;text-transform:uppercase;text-align:left;}
+tbody tr{border-bottom:1px solid var(--border);transition:.12s;}
+tbody tr:last-child{border-bottom:none;}
+tbody tr:hover{background:var(--hover);}
+td{padding:11px 14px;font-size:.82rem;color:var(--t2);}
+td strong{color:var(--t1);}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:2px 9px;
+  border-radius:20px;font-size:.68rem;font-weight:600;}
+.badge::before{content:'';width:5px;height:5px;border-radius:50%;}
+.bp{background:var(--wg);color:var(--warn)}.bp::before{background:var(--warn)}
+.bpr{background:var(--ag);color:var(--accent)}.bpr::before{background:var(--accent)}
+.bf{background:var(--sg);color:var(--success)}.bf::before{background:var(--success)}
+.bh{background:var(--dg);color:var(--danger)}.bh::before{background:var(--danger)}
+.bm{background:var(--wg);color:var(--warn)}.bm::before{background:var(--warn)}
+.bl{background:var(--sg);color:var(--success)}.bl::before{background:var(--success)}
+.bc{font-size:.7rem;color:var(--t3);margin-bottom:6px;}
+.bc span{color:var(--accent);}
+.pt{font-size:1.35rem;font-weight:700;display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+.pt-ic{width:36px;height:36px;border-radius:var(--rs);display:flex;align-items:center;
+  justify-content:center;font-size:1rem;}
+.ps{font-size:.8rem;color:var(--t2);margin-bottom:20px;margin-left:46px;}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;
+  border-radius:var(--rs);font-size:.82rem;font-weight:600;cursor:pointer;
+  border:none;transition:.12s;font-family:'Sora',sans-serif;text-decoration:none;}
+.btn-p{background:var(--accent);color:#fff;}
+.btn-p:hover{background:#4a7ce0;}
+.btn-s{background:var(--success);color:#0b0d12;}
+.btn-w{background:var(--warn);color:#0b0d12;}
+.btn-o{background:transparent;border:1px solid var(--border);color:var(--t2);}
+.btn-o:hover{border-color:var(--accent);color:var(--accent);}
+.btn-sm{padding:5px 11px;font-size:.75rem;}
+.fg{display:flex;flex-direction:column;gap:5px;}
+.fl{font-size:.75rem;color:var(--t2);font-weight:500;}
+.fc{background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);
+  padding:8px 11px;color:var(--t1);font-size:.84rem;font-family:'Sora',sans-serif;
+  transition:.15s;outline:none;width:100%;}
+.fc:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--ag);}
+.fc::placeholder{color:var(--t3);}
+select.fc{cursor:pointer;}
+textarea.fc{resize:vertical;min-height:80px;}
+.mono{font-family:'JetBrains Mono',monospace;}
+.acc{color:var(--accent)}.suc{color:var(--success)}.wrn{color:var(--warn)}.dng{color:var(--danger)}
+</style>
+{% block extra_css %}{% endblock %}
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="nav">
+  <div class="nav-logo"><i class="bi bi-cpu-fill"></i>TechRepair<span class="pulse"></span></div>
+  <div class="nav-r">
+    <div class="role-chip">{{ request.user.get_rol_display }}</div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div style="text-align:right;">
+        <div style="font-size:.8rem;font-weight:600;">{{ request.user.get_full_name|default:request.user.username }}</div>
+        <div style="font-size:.68rem;color:var(--t3);">{{ request.user.get_rol_display }}</div>
+      </div>
+      <div class="avatar">{{ request.user.username|first|upper }}</div>
+    </div>
+    <a href="{% url 'logout' %}" style="color:var(--t3);font-size:.8rem;margin-left:8px;">
+      <i class="bi bi-box-arrow-right"></i>
+    </a>
+  </div>
+</nav>
+
+<!-- SIDEBAR -->
+<aside class="sb">
+  <div class="sb-sect">Principal</div>
+  <a href="{% url 'dashboard' %}" class="sb-item {% if request.resolver_match.url_name == 'dashboard' %}on{% endif %}">
+    <i class="bi bi-grid-1x2-fill"></i> Dashboard
+  </a>
+
+  {% if request.user.rol == 'admin' %}
+  <div class="sb-sect">Usuarios</div>
+  <a href="{% url 'registrar_usuario' %}" class="sb-item {% if request.resolver_match.url_name == 'registrar_usuario' %}on{% endif %}">
+    <i class="bi bi-person-plus-fill"></i> Registrar Usuario
+  </a>
+  <div class="sb-sect">Clientes</div>
+  <a href="{% url 'registrar_cliente' %}" class="sb-item {% if request.resolver_match.url_name == 'registrar_cliente' %}on{% endif %}">
+    <i class="bi bi-person-badge-fill"></i> Registrar Cliente
+  </a>
+  <a href="{% url 'consultar_clientes' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_clientes' %}on{% endif %}">
+    <i class="bi bi-person-lines-fill"></i> Consultar Clientes
+  </a>
+  <div class="sb-sect">Equipos</div>
+  <a href="{% url 'registrar_equipo' %}" class="sb-item {% if request.resolver_match.url_name == 'registrar_equipo' %}on{% endif %}">
+    <i class="bi bi-laptop-fill"></i> Registrar Equipo
+  </a>
+  <a href="{% url 'consultar_equipos' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_equipos' %}on{% endif %}">
+    <i class="bi bi-search"></i> Consultar Equipos
+  </a>
+  <div class="sb-sect">Solicitudes</div>
+  <a href="{% url 'registrar_solicitud' %}" class="sb-item {% if request.resolver_match.url_name == 'registrar_solicitud' %}on{% endif %}">
+    <i class="bi bi-file-earmark-plus-fill"></i> Nueva Solicitud
+  </a>
+  <a href="{% url 'consultar_solicitudes' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_solicitudes' %}on{% endif %}">
+    <i class="bi bi-card-list"></i> Consultar Solicitudes
+  </a>
+  <div class="sb-sect">Reportes</div>
+  <a href="{% url 'reportes' %}" class="sb-item {% if request.resolver_match.url_name == 'reportes' %}on{% endif %}">
+    <i class="bi bi-bar-chart-fill"></i> Reportes
+  </a>
+  {% endif %}
+
+  {% if request.user.rol == 'recep' %}
+  <div class="sb-sect">Clientes</div>
+  <a href="{% url 'registrar_cliente' %}" class="sb-item {% if request.resolver_match.url_name == 'registrar_cliente' %}on{% endif %}">
+    <i class="bi bi-person-badge-fill"></i> Registrar Cliente
+  </a>
+  <a href="{% url 'consultar_clientes' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_clientes' %}on{% endif %}">
+    <i class="bi bi-person-lines-fill"></i> Consultar Clientes
+  </a>
+  <div class="sb-sect">Equipos</div>
+  <a href="{% url 'consultar_equipos' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_equipos' %}on{% endif %}">
+    <i class="bi bi-search"></i> Consultar Equipos
+  </a>
+  <div class="sb-sect">Solicitudes</div>
+  <a href="{% url 'registrar_solicitud' %}" class="sb-item {% if request.resolver_match.url_name == 'registrar_solicitud' %}on{% endif %}">
+    <i class="bi bi-file-earmark-plus-fill"></i> Nueva Solicitud
+  </a>
+  <a href="{% url 'consultar_solicitudes' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_solicitudes' %}on{% endif %}">
+    <i class="bi bi-card-list"></i> Consultar Solicitudes
+  </a>
+  <div class="sb-sect">Reportes</div>
+  <a href="{% url 'reportes' %}" class="sb-item {% if request.resolver_match.url_name == 'reportes' %}on{% endif %}">
+    <i class="bi bi-bar-chart-fill"></i> Reportes
+  </a>
+  {% endif %}
+
+  {% if request.user.rol == 'tec' %}
+  <div class="sb-sect">Mis Trabajos</div>
+  <a href="{% url 'consultar_solicitudes' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_solicitudes' %}on{% endif %}">
+    <i class="bi bi-kanban-fill"></i> Mis Solicitudes
+  </a>
+  <div class="sb-sect">Equipos</div>
+  <a href="{% url 'consultar_equipos' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_equipos' %}on{% endif %}">
+    <i class="bi bi-search"></i> Consultar Equipos
+  </a>
+{% endif %}
+
+  <div class="sb-sect">Sistema</div>
+  <a href="{% url 'logout' %}" class="sb-item">
+    <i class="bi bi-box-arrow-right"></i> Cerrar Sesión
+  </a>
+</aside>
+
+<!-- CONTENIDO -->
+<main class="main">
+  <div class="view">
+    {% block content %}{% endblock %}
+  </div>
+</main>
+
+</body>
+</html>

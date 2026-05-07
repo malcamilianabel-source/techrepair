@@ -1,0 +1,235 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Detalle Solicitud #{{ solicitud.id }}{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / Solicitudes / <span>Detalle #S-{{ solicitud.id }}</span></div>
+<div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
+  <div>
+    <div class="pt">
+      <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
+        <i class="bi bi-file-earmark-text-fill"></i>
+      </div>
+      Solicitud <span class="mono acc">#S-{{ solicitud.id }}</span>
+    </div>
+    <div class="ps">Detalle completo de la orden de reparación</div>
+  </div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+  {% if request.user.rol == 'tec' %}
+    <a href="{% url 'avance' solicitud.pk %}" class="btn btn-o btn-sm">
+      <i class="bi bi-journal-text"></i> Bitácora
+    </a>
+    <a href="{% url 'diagnostico' solicitud.pk %}" class="btn btn-p btn-sm">
+      <i class="bi bi-clipboard2-pulse-fill"></i> Diagnóstico
+    </a>
+    <a href="{% url 'cambiar_estado' solicitud.pk %}" class="btn btn-w btn-sm">
+      <i class="bi bi-arrow-repeat"></i> Cambiar Estado
+    </a>
+    <a href="{% url 'repuestos' solicitud.pk %}" class="btn btn-o btn-sm">
+      <i class="bi bi-box-seam-fill"></i> Repuestos
+    </a>
+    <a href="{% url 'costos' solicitud.pk %}" class="btn btn-o btn-sm">
+      <i class="bi bi-currency-dollar"></i> Costos
+    </a>
+  {% endif %}
+
+  {% if request.user.rol == 'admin' %}
+    <a href="{% url 'avance' solicitud.pk %}" class="btn btn-o btn-sm">
+      <i class="bi bi-journal-text"></i> Bitácora
+    </a>
+    <a href="{% url 'diagnostico' solicitud.pk %}" class="btn btn-p btn-sm">
+      <i class="bi bi-clipboard2-pulse-fill"></i> Diagnóstico
+    </a>
+    <a href="{% url 'cambiar_estado' solicitud.pk %}" class="btn btn-w btn-sm">
+      <i class="bi bi-arrow-repeat"></i> Cambiar Estado
+    </a>
+    <a href="{% url 'repuestos' solicitud.pk %}" class="btn btn-o btn-sm">
+      <i class="bi bi-box-seam-fill"></i> Repuestos
+    </a>
+    <a href="{% url 'costos' solicitud.pk %}" class="btn btn-o btn-sm">
+      <i class="bi bi-currency-dollar"></i> Costos
+    </a>
+  {% endif %}
+
+  {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
+    <a href="{% url 'asignar_tecnico' solicitud.pk %}" class="btn btn-o btn-sm">
+      <i class="bi bi-person-check"></i> Asignar Técnico
+    </a>
+  {% endif %}
+
+  <a href="{% url 'consultar_solicitudes' %}" class="btn btn-o btn-sm">
+    <i class="bi bi-arrow-left"></i> Volver
+  </a>
+</div>
+</div>
+
+<div class="two">
+  <div style="display:flex;flex-direction:column;gap:16px;">
+    <!-- INFO GENERAL -->
+    <div class="card">
+      <div class="ct">Información general</div>
+      <div class="dg">
+        <div class="di"><div class="dl">Código</div><div class="dv acc mono">#S-{{ solicitud.id }}</div></div>
+        <div class="di"><div class="dl">Estado</div>
+          <div class="dv">
+            {% if solicitud.estado == 'pendiente' %}<span class="badge bp">Pendiente</span>
+            {% elif solicitud.estado == 'proceso' %}<span class="badge bpr">En proceso</span>
+            {% elif solicitud.estado == 'finalizado' %}<span class="badge bf">Finalizado</span>
+            {% else %}<span class="badge">{{ solicitud.get_estado_display }}</span>{% endif %}
+          </div>
+        </div>
+        <div class="di"><div class="dl">Cliente</div><div class="dv">{{ solicitud.cliente.nombre }}</div></div>
+        <div class="di"><div class="dl">Teléfono</div><div class="dv">{{ solicitud.cliente.telefono }}</div></div>
+        <div class="di"><div class="dl">Equipo</div><div class="dv">{{ solicitud.equipo.get_marca_display }} {{ solicitud.equipo.modelo }}</div></div>
+        <div class="di"><div class="dl">Serie</div><div class="dv mono">{{ solicitud.equipo.serie }}</div></div>
+        <div class="di"><div class="dl">Tipo</div><div class="dv">{{ solicitud.get_tipo_reparacion_display|default:"—" }}</div></div>
+        <div class="di"><div class="dl">Prioridad</div>
+          <div class="dv">
+            {% if solicitud.prioridad == 'alta' %}<span class="badge bh">Alta</span>
+            {% elif solicitud.prioridad == 'media' %}<span class="badge bm">Media</span>
+            {% else %}<span class="badge bl">Baja</span>{% endif %}
+          </div>
+        </div>
+        <div class="di"><div class="dl">Técnico</div>
+          <div class="dv">
+            {% if solicitud.detalle.tecnico %}
+              {{ solicitud.detalle.tecnico.get_full_name|default:solicitud.detalle.tecnico.username }}
+            {% else %}<span style="color:var(--t3);">Sin asignar</span>{% endif %}
+          </div>
+        </div>
+        <div class="di"><div class="dl">Fecha ingreso</div><div class="dv">{{ solicitud.fecha_ingreso }}</div></div>
+      </div>
+    </div>
+
+    <!-- TIEMPO ESTIMADO -->
+    {% if solicitud.tiempo_estimado_texto %}
+<div style="background:linear-gradient(135deg,rgba(91,141,238,.08),rgba(0,201,167,.05));
+  border:1px solid rgba(91,141,238,.25);border-radius:var(--r);padding:18px;">
+  <div class="ct">⏱ tiempo estimado de entrega</div>
+  <div style="display:flex;align-items:flex-end;gap:16px;">
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:2.4rem;
+        font-weight:700;color:var(--accent);line-height:1;">
+        {{ solicitud.tiempo_estimado_texto }}
+      </div>
+      <div style="font-size:.78rem;color:var(--t2);margin-top:4px;">
+        tiempo estimado de reparación
+      </div>
+    </div>
+    <div style="flex:1;">
+      <div style="font-size:.75rem;color:var(--t2);margin-bottom:5px;">
+        Fecha estimada de entrega:
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:1.05rem;
+        font-weight:700;color:var(--teal);">{{ solicitud.fecha_ingreso }}</div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+    <!-- DESCRIPCIÓN -->
+    <div class="card">
+      <div class="ct">Descripción del problema</div>
+      <!-- DIAGNÓSTICO -->
+{% if solicitud.detalle.diagnostico %}
+<div class="card">
+  <div class="ct">🔍 Diagnóstico técnico</div>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    <div class="di">
+      <div class="dl">Fallas detectadas</div>
+      <div class="dv">{{ solicitud.detalle.diagnostico }}</div>
+    </div>
+    {% if solicitud.detalle.componentes %}
+    <div class="di">
+      <div class="dl">Componentes afectados</div>
+      <div class="dv">{{ solicitud.detalle.componentes }}</div>
+    </div>
+    {% endif %}
+    {% if solicitud.detalle.causa_probable %}
+    <div class="di">
+      <div class="dl">Causa probable</div>
+      <div class="dv">{{ solicitud.detalle.causa_probable }}</div>
+    </div>
+    {% endif %}
+    {% if solicitud.detalle.trabajo_realizado %}
+    <div class="di">
+      <div class="dl">Trabajo realizado</div>
+      <div class="dv">{{ solicitud.detalle.trabajo_realizado }}</div>
+    </div>
+    {% endif %}
+    {% if solicitud.detalle.recomendaciones %}
+    <div class="di">
+      <div class="dl">Recomendaciones</div>
+      <div class="dv">{{ solicitud.detalle.recomendaciones }}</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endif %}
+      <div style="font-size:.83rem;color:var(--t2);line-height:1.6;
+        border-left:2px solid var(--accent);padding-left:12px;">
+        {{ solicitud.descripcion }}
+      </div>
+      {% if solicitud.observaciones %}
+      <div class="ct" style="margin-top:14px;">Observaciones del cliente</div>
+      <div style="font-size:.82rem;color:var(--t2);
+        border-left:2px solid var(--warn);padding-left:12px;">
+        {{ solicitud.observaciones }}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- HISTORIAL -->
+  <div class="card">
+    <div class="ct">Historial de la solicitud</div>
+    {% if historial %}
+    <div class="tl">
+      {% for h in historial %}
+      <div class="tl-item">
+        <div class="tl-l">
+          <div class="tl-dot {% if forloop.last %}act{% else %}done{% endif %}"></div>
+          {% if not forloop.last %}<div class="tl-con"></div>{% endif %}
+        </div>
+        <div class="tl-c">
+          <div class="tl-t">{{ h.estado_antes }} → {{ h.estado_nuevo }}</div>
+          <div class="tl-m">
+            {{ h.fecha_hora|date:"d/m/Y H:i" }} —
+            {{ h.usuario.get_full_name|default:h.usuario.username }}
+          </div>
+          {% if h.observacion %}
+          <div class="tl-d">{{ h.observacion }}</div>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:20px;color:var(--t3);">
+      Sin movimientos registrados.
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<style>
+.dg{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.di{background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:11px 14px;}
+.dl{font-size:.68rem;color:var(--t3);margin-bottom:3px;}
+.dv{font-size:.87rem;color:var(--t1);font-weight:500;}
+.dv.acc{color:var(--accent);}
+.tl{display:flex;flex-direction:column;gap:0;}
+.tl-item{display:flex;gap:14px;padding-bottom:18px;}
+.tl-item:last-child{padding-bottom:0;}
+.tl-l{display:flex;flex-direction:column;align-items:center;}
+.tl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px;border:2px solid var(--card);}
+.tl-dot.done{background:var(--success);}
+.tl-dot.act{background:var(--accent);}
+.tl-con{width:2px;background:var(--border);flex:1;margin-top:4px;}
+.tl-c{flex:1;}
+.tl-t{font-size:.82rem;font-weight:600;color:var(--t1);}
+.tl-m{font-size:.72rem;color:var(--t3);margin-top:2px;}
+.tl-d{font-size:.79rem;color:var(--t2);margin-top:6px;padding:8px 11px;
+  background:var(--surface);border-radius:var(--rs);border-left:2px solid var(--accent);}
+</style>
+{% endblock %}

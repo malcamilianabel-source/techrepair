@@ -1,0 +1,105 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Cambiar Estado{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / Solicitudes / <span>Cambiar Estado</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--wg);color:var(--warn);">
+      <i class="bi bi-arrow-repeat"></i>
+    </div>
+    Cambiar Estado de Solicitud
+  </div>
+  <div class="ps">Solicitud <strong class="acc">#S-{{ solicitud.id }}</strong>
+    — {{ solicitud.cliente.nombre }}</div>
+</div>
+
+<div class="card" style="max-width:560px;">
+
+  <!-- FLUJO DE ESTADOS -->
+  <div style="display:flex;align-items:center;margin-bottom:20px;">
+    <div style="flex:1;text-align:center;">
+      <div style="width:40px;height:40px;border-radius:50%;
+        {% if solicitud.estado == 'pendiente' %}background:var(--warn);{% else %}background:var(--surface);border:2px dashed var(--border);{% endif %}
+        display:flex;align-items:center;justify-content:center;margin:0 auto 5px;">
+        <i class="bi bi-hourglass-split" style="{% if solicitud.estado == 'pendiente' %}color:#0b0d12;{% else %}color:var(--t3);{% endif %}"></i>
+      </div>
+      <div style="font-size:.68rem;font-weight:700;
+        {% if solicitud.estado == 'pendiente' %}color:var(--warn);{% else %}color:var(--t3);{% endif %}">
+        PENDIENTE
+      </div>
+    </div>
+    <div style="flex:1;height:2px;background:var(--border);"></div>
+    <div style="flex:1;text-align:center;">
+      <div style="width:40px;height:40px;border-radius:50%;
+        {% if solicitud.estado == 'proceso' %}background:var(--accent);{% else %}background:var(--surface);border:2px dashed var(--border);{% endif %}
+        display:flex;align-items:center;justify-content:center;margin:0 auto 5px;">
+        <i class="bi bi-gear-fill" style="{% if solicitud.estado == 'proceso' %}color:#fff;{% else %}color:var(--t3);{% endif %}"></i>
+      </div>
+      <div style="font-size:.68rem;font-weight:700;
+        {% if solicitud.estado == 'proceso' %}color:var(--accent);{% else %}color:var(--t3);{% endif %}">
+        EN PROCESO
+      </div>
+    </div>
+    <div style="flex:1;height:2px;background:var(--border);"></div>
+    <div style="flex:1;text-align:center;">
+      <div style="width:40px;height:40px;border-radius:50%;
+        {% if solicitud.estado == 'finalizado' %}background:var(--success);{% else %}background:var(--surface);border:2px dashed var(--border);{% endif %}
+        display:flex;align-items:center;justify-content:center;margin:0 auto 5px;">
+        <i class="bi bi-check-circle-fill" style="{% if solicitud.estado == 'finalizado' %}color:#0b0d12;{% else %}color:var(--t3);{% endif %}"></i>
+      </div>
+      <div style="font-size:.68rem;font-weight:700;
+        {% if solicitud.estado == 'finalizado' %}color:var(--success);{% else %}color:var(--t3);{% endif %}">
+        FINALIZADO
+      </div>
+    </div>
+    <div style="flex:1;height:2px;background:var(--border);"></div>
+    <div style="flex:1;text-align:center;">
+      <div style="width:40px;height:40px;border-radius:50%;
+        {% if solicitud.estado == 'entregado' %}background:var(--teal);{% else %}background:var(--surface);border:2px dashed var(--border);{% endif %}
+        display:flex;align-items:center;justify-content:center;margin:0 auto 5px;">
+        <i class="bi bi-box-arrow-up-right" style="{% if solicitud.estado == 'entregado' %}color:#0b0d12;{% else %}color:var(--t3);{% endif %}"></i>
+      </div>
+      <div style="font-size:.68rem;font-weight:700;
+        {% if solicitud.estado == 'entregado' %}color:var(--teal);{% else %}color:var(--t3);{% endif %}">
+        ENTREGADO
+      </div>
+    </div>
+  </div>
+
+  <form method="POST">
+    {% csrf_token %}
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="fg">
+        <label class="fl">Estado actual</label>
+        <input class="fc" value="{{ solicitud.get_estado_display }}"
+          disabled style="opacity:.5;cursor:not-allowed;">
+      </div>
+      <div class="fg">
+        <label class="fl">Nuevo estado <span style="color:var(--danger);">*</span></label>
+        {{ form.estado }}
+      </div>
+      <div class="fg">
+        <label class="fl">Observación del cambio</label>
+        {{ form.observacion }}
+      </div>
+      <div style="background:var(--wg);border:1px solid rgba(245,166,35,.3);
+        color:var(--warn);padding:10px 14px;border-radius:var(--rs);
+        font-size:.8rem;display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+        El cambio quedará registrado con fecha, hora y usuario responsable.
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:18px;
+      padding-top:16px;border-top:1px solid var(--border);">
+      <button class="btn btn-p" type="submit">
+        <i class="bi bi-check2-circle"></i> Guardar Cambio
+      </button>
+      <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-o">
+        <i class="bi bi-arrow-left"></i> Volver
+      </a>
+    </div>
+  </form>
+</div>
+{% endblock %}
