@@ -131,7 +131,10 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Base de datos desde variable de entorno
 DATABASE_URL = os.environ.get('DATABASE_URL')
 if DATABASE_URL:
-    DATABASES['default'] = dj_database_url.parse(DATABASE_URL)
+    DATABASES['default'] = dj_database_url.config(
+        default=DATABASE_URL,
+        conn_max_age=600
+    )
 
 # Seguridad
 ALLOWED_HOSTS = ['*']
