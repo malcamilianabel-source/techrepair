@@ -159,6 +159,10 @@ textarea.fc{resize:vertical;min-height:80px;}
   <a href="{% url 'consultar_equipos' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_equipos' %}on{% endif %}">
     <i class="bi bi-search"></i> Consultar Equipos
   </a>
+  <div class="sb-sect">Mis Trabajos</div>
+  <a href="{% url 'consultar_solicitudes' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_solicitudes' %}on{% endif %}">
+    <i class="bi bi-kanban-fill"></i> Todas las Solicitudes
+  </a>
   <div class="sb-sect">Solicitudes</div>
   <a href="{% url 'registrar_solicitud' %}" class="sb-item {% if request.resolver_match.url_name == 'registrar_solicitud' %}on{% endif %}">
     <i class="bi bi-file-earmark-plus-fill"></i> Nueva Solicitud
@@ -169,6 +173,10 @@ textarea.fc{resize:vertical;min-height:80px;}
   <div class="sb-sect">Reportes</div>
   <a href="{% url 'reportes' %}" class="sb-item {% if request.resolver_match.url_name == 'reportes' %}on{% endif %}">
     <i class="bi bi-bar-chart-fill"></i> Reportes
+  </a>
+  <div class="sb-sect">Entregas</div>
+  <a href="{% url 'consultar_solicitudes' %}?estado=finalizado" class="sb-item {% if request.resolver_match.url_name == 'entrega' %}on{% endif %}">
+    <i class="bi bi-box-arrow-up-right"></i> Entrega de Equipo
   </a>
   {% endif %}
 
@@ -194,6 +202,10 @@ textarea.fc{resize:vertical;min-height:80px;}
   <div class="sb-sect">Reportes</div>
   <a href="{% url 'reportes' %}" class="sb-item {% if request.resolver_match.url_name == 'reportes' %}on{% endif %}">
     <i class="bi bi-bar-chart-fill"></i> Reportes
+  </a>
+  <div class="sb-sect">Entregas</div>
+  <a href="{% url 'consultar_solicitudes' %}?estado=finalizado" class="sb-item {% if request.resolver_match.url_name == 'entrega' %}on{% endif %}">
+    <i class="bi bi-box-arrow-up-right"></i> Entrega de Equipo
   </a>
   {% endif %}
 

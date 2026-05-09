@@ -15,15 +15,15 @@
     <div class="ps">Detalle completo de la orden de reparación</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-  {% if request.user.rol == 'tec' %}
-    <a href="{% url 'avance' solicitud.pk %}" class="btn btn-o btn-sm">
+  {% if request.user.rol == 'tec' or request.user.rol == 'admin' %}
+    <a href="{% url 'cambiar_estado' solicitud.pk %}" class="btn btn-w btn-sm">
+      <i class="bi bi-arrow-repeat"></i> Cambiar Estado
+    </a>
+    <a href="{% url 'avance' solicitud.pk %}" class="btn btn-p btn-sm">
       <i class="bi bi-journal-text"></i> Bitácora
     </a>
     <a href="{% url 'diagnostico' solicitud.pk %}" class="btn btn-p btn-sm">
       <i class="bi bi-clipboard2-pulse-fill"></i> Diagnóstico
-    </a>
-    <a href="{% url 'cambiar_estado' solicitud.pk %}" class="btn btn-w btn-sm">
-      <i class="bi bi-arrow-repeat"></i> Cambiar Estado
     </a>
     <a href="{% url 'repuestos' solicitud.pk %}" class="btn btn-o btn-sm">
       <i class="bi bi-box-seam-fill"></i> Repuestos
@@ -32,38 +32,31 @@
       <i class="bi bi-currency-dollar"></i> Costos
     </a>
   {% endif %}
-
-  {% if request.user.rol == 'admin' %}
-    <a href="{% url 'avance' solicitud.pk %}" class="btn btn-o btn-sm">
-      <i class="bi bi-journal-text"></i> Bitácora
-    </a>
-    <a href="{% url 'diagnostico' solicitud.pk %}" class="btn btn-p btn-sm">
-      <i class="bi bi-clipboard2-pulse-fill"></i> Diagnóstico
-    </a>
-    <a href="{% url 'cambiar_estado' solicitud.pk %}" class="btn btn-w btn-sm">
-      <i class="bi bi-arrow-repeat"></i> Cambiar Estado
-    </a>
-    <a href="{% url 'repuestos' solicitud.pk %}" class="btn btn-o btn-sm">
-      <i class="bi bi-box-seam-fill"></i> Repuestos
-    </a>
-    <a href="{% url 'costos' solicitud.pk %}" class="btn btn-o btn-sm">
-      <i class="bi bi-currency-dollar"></i> Costos
-    </a>
-  {% endif %}
-
   {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
     <a href="{% url 'asignar_tecnico' solicitud.pk %}" class="btn btn-o btn-sm">
       <i class="bi bi-person-check"></i> Asignar Técnico
     </a>
   {% endif %}
-
+  {% if solicitud.estado == 'finalizado' %}{% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
+    <a href="{% url 'entrega' solicitud.pk %}" class="btn btn-s btn-sm">
+      <i class="bi bi-box-arrow-up-right"></i> Entregar Equipo
+    </a>
+  {% endif %}{% endif %}
+  <a href="{% url 'informe_pdf' solicitud.pk %}" target="_blank" class="btn btn-o btn-sm">
+    <i class="bi bi-file-earmark-pdf-fill"></i> PDF
+  </a>
+  {% if solicitud.estado == 'entregado' and request.user.rol == 'admin' %}
+  <a href="{% url 'eliminar_solicitud' solicitud.pk %}"
+    class="btn btn-sm" style="background:var(--danger);color:#fff;">
+    <i class="bi bi-trash3-fill"></i> Eliminar
+  </a>
+  {% endif %}
   <a href="{% url 'consultar_solicitudes' %}" class="btn btn-o btn-sm">
     <i class="bi bi-arrow-left"></i> Volver
   </a>
 </div>
-</div>
 
-<div class="two">
+<div style="display:grid;grid-template-columns:1.2fr 1fr;gap:18px;width:100%;">
   <div style="display:flex;flex-direction:column;gap:16px;">
     <!-- INFO GENERAL -->
     <div class="card">

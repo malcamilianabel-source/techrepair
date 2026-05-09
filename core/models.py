@@ -111,6 +111,10 @@ class Solicitud(models.Model):
     dias_estimados        = models.IntegerField(null=True, blank=True)
     fecha_estimada        = models.DateField(null=True, blank=True)
     tiempo_estimado_texto = models.CharField(max_length=50, blank=True, default='')
+    fecha_entrega        = models.DateField(null=True, blank=True)
+    hora_entrega         = models.TimeField(null=True, blank=True)
+    observaciones_entrega= models.TextField(blank=True, default='')
+    confirmacion_cliente = models.BooleanField(default=False)
     creado_en        = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):

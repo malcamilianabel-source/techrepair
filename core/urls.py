@@ -28,6 +28,9 @@ urlpatterns = [
     path('solicitudes/<int:pk>/avance/', views.avance, name='avance'),
     path('solicitudes/<int:pk>/repuestos/', views.repuestos, name='repuestos'),
     path('solicitudes/<int:pk>/costos/', views.costos, name='costos'),
+    path('solicitudes/<int:pk>/entrega/', views.entrega, name='entrega'),
+    path('solicitudes/<int:pk>/pdf/', views.informe_pdf, name='informe_pdf'),
+    path('solicitudes/<int:pk>/eliminar/', views.eliminar_solicitud, name='eliminar_solicitud'),
 
     # ── USUARIOS ──
     path('usuarios/registrar/', views.registrar_usuario, name='registrar_usuario'),
