@@ -36,6 +36,11 @@
     <a href="{% url 'asignar_tecnico' solicitud.pk %}" class="btn btn-o btn-sm">
       <i class="bi bi-person-check"></i> Asignar Técnico
     </a>
+    {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
+<a href="{% url 'reasignar_tecnico' solicitud.pk %}" class="btn btn-o btn-sm">
+  <i class="bi bi-arrow-left-right"></i> Reasignar Técnico
+</a>
+{% endif %}
   {% endif %}
   {% if solicitud.estado == 'finalizado' %}{% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
     <a href="{% url 'entrega' solicitud.pk %}" class="btn btn-s btn-sm">

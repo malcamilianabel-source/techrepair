@@ -85,14 +85,19 @@ class SolicitudForm(forms.ModelForm):
 
 # ── FORMULARIO CAMBIAR ESTADO ──────────────────────────────────
 class CambiarEstadoForm(forms.Form):
-    ESTADOS = [
-        ('pendiente',  'Pendiente'),
-        ('proceso',    'En proceso'),
-        ('finalizado', 'Finalizado'),
-        ('entregado',  'Entregado'),
+    ESTADOS_ADMIN = [
+    ('pendiente',  'Pendiente'),
+    ('proceso',    'En proceso'),
+    ('finalizado', 'Finalizado'),
+    ('entregado',  'Entregado'),
+    ]
+    ESTADOS_TEC = [
+    ('pendiente',  'Pendiente'),
+    ('proceso',    'En proceso'),
+    ('finalizado', 'Finalizado'),
     ]
     estado      = forms.ChoiceField(
-        choices=ESTADOS,
+        choices=ESTADOS_ADMIN,
         widget=forms.Select(attrs={'class': 'fc'}),
         label='Nuevo estado')
     observacion = forms.CharField(

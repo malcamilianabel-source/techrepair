@@ -112,6 +112,16 @@
               {% else %}—{% endif %}
            </td>
           <td style="display:flex;gap:4px;">
+            {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
+{% if sol.prioridad != 'alta' %}
+<a href="{% url 'marcar_prioritaria' sol.pk %}"
+  onclick="return confirm('¿Marcar esta solicitud como prioritaria?')"
+  class="btn btn-o btn-sm" title="Marcar prioritaria"
+  style="color:var(--warn);">
+  <i class="bi bi-exclamation-triangle-fill"></i>
+</a>
+{% endif %}
+{% endif %}
   <a href="{% url 'detalle_solicitud' sol.pk %}"
     class="btn btn-o btn-sm" title="Ver detalle">
     <i class="bi bi-eye"></i>

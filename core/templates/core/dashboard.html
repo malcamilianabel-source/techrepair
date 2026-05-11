@@ -1,8 +1,134 @@
 {% extends 'core/base.html' %}
-
 {% block title %}Dashboard{% endblock %}
-
 {% block content %}
+
+{% if request.user.rol == 'tec' %}
+<!-- ── DASHBOARD TÉCNICO ── -->
+<div class="bc">Inicio / <span>Panel de Control</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
+      <i class="bi bi-grid-1x2-fill"></i>
+    </div>
+    Panel de Control
+  </div>
+  <div class="ps">Vista general del taller · Técnico</div>
+</div>
+
+<!-- STATS TÉCNICO -->
+<div class="grid4" style="margin-bottom:18px;">
+  <div class="stat b">
+    <div class="sl">Mis trabajos activos</div>
+    <div class="sv b">{{ total_activas }}</div>
+    <div class="ss">Pendientes + En proceso</div>
+    <i class="bi bi-kanban-fill si"></i>
+  </div>
+  <div class="stat o">
+    <div class="sl">Pendientes</div>
+    <div class="sv o">{{ pendientes }}</div>
+    <div class="ss">Sin iniciar</div>
+    <i class="bi bi-hourglass-split si"></i>
+  </div>
+  <div class="stat r">
+    <div class="sl">En proceso</div>
+    <div class="sv r">{{ en_proceso }}</div>
+    <div class="ss">En reparación</div>
+    <i class="bi bi-gear-fill si"></i>
+  </div>
+  <div class="stat g">
+    <div class="sl">Horas de carga</div>
+    <div class="sv g">{{ total_horas }}h</div>
+    <div class="ss">Horas estimadas activas</div>
+    <i class="bi bi-clock-fill si"></i>
+  </div>
+</div>
+
+<!-- CARGA VISUAL TÉCNICO -->
+{% if total_horas > 0 %}
+<div class="card" style="margin-bottom:18px;">
+  <div class="ct">⏱ Mi carga de trabajo actual</div>
+  <div style="display:flex;align-items:center;gap:20px;flex-wrap:wrap;">
+    <div style="flex:1;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
+        <span style="font-size:.85rem;color:var(--t2);">{{ total_activas }} trabajo(s) activo(s)</span>
+        <span style="font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--accent);">{{ total_horas }} hora(s) estimadas</span>
+      </div>
+      <div style="height:8px;background:var(--border);border-radius:4px;">
+        <div style="height:100%;width:{% if total_horas >= 10 %}100{% else %}{{ total_horas }}0{% endif %}%;
+          max-width:100%;background:linear-gradient(90deg,var(--accent),var(--teal));
+          border-radius:4px;transition:.3s;"></div>
+      </div>
+      <div style="font-size:.72rem;color:var(--t3);margin-top:4px;">
+        {% if total_horas <= 3 %}Carga baja — disponible para más trabajos
+        {% elif total_horas <= 6 %}Carga media — capacidad moderada
+        {% else %}Carga alta — múltiples trabajos en cola{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- MIS SOLICITUDES -->
+<div class="card">
+  <div class="ct">Mis solicitudes asignadas</div>
+  {% if mis_solicitudes %}
+  <div class="tw">
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Cliente</th>
+          <th>Equipo</th>
+          <th>Tipo</th>
+          <th>Prioridad</th>
+          <th>Estado</th>
+          <th>T. Estimado</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sol in mis_solicitudes %}
+        <tr>
+          <td><strong class="mono acc">#S-{{ sol.id }}</strong></td>
+          <td><strong>{{ sol.cliente.nombre }}</strong></td>
+          <td>{{ sol.equipo.get_marca_display }} {{ sol.equipo.modelo }}</td>
+          <td>{{ sol.get_tipo_reparacion_display|default:"—" }}</td>
+          <td>
+            {% if sol.prioridad == 'alta' %}<span class="badge bh">Alta</span>
+            {% elif sol.prioridad == 'media' %}<span class="badge bm">Media</span>
+            {% else %}<span class="badge bl">Baja</span>{% endif %}
+          </td>
+          <td>
+            {% if sol.estado == 'pendiente' %}<span class="badge bp">Pendiente</span>
+            {% elif sol.estado == 'proceso' %}<span class="badge bpr">En proceso</span>
+            {% elif sol.estado == 'finalizado' %}<span class="badge bf">Finalizado</span>
+            {% else %}<span class="badge">{{ sol.get_estado_display }}</span>{% endif %}
+          </td>
+          <td class="mono">
+            {% if sol.tiempo_estimado_texto %}
+              <span style="color:var(--accent);">{{ sol.tiempo_estimado_texto }}</span>
+            {% else %}—{% endif %}
+          </td>
+          <td>
+            <a href="{% url 'detalle_solicitud' sol.pk %}" class="btn btn-o btn-sm">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div style="text-align:center;padding:30px;color:var(--t3);">
+    <i class="bi bi-inbox" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+    No tienes solicitudes asignadas aún.
+  </div>
+  {% endif %}
+</div>
+
+{% else %}
+<!-- ── DASHBOARD ADMIN / RECEPCIONISTA ── -->
 <div class="bc">Inicio / <span>Panel de Control</span></div>
 <div style="margin-bottom:20px;">
   <div class="pt">
@@ -14,25 +140,25 @@
   <div class="ps">Vista general del taller · {{ request.user.get_rol_display }}</div>
 </div>
 
-<!-- ESTADÍSTICAS -->
-<div class="grid4">
+<!-- STATS GENERALES -->
+<div class="grid4" style="margin-bottom:18px;">
   <div class="stat b">
     <div class="sl">Solicitudes activas</div>
-    <div class="sv b">{{ total_solicitudes }}</div>
+    <div class="sv b">{{ total_sol }}</div>
     <div class="ss">Total registradas</div>
     <i class="bi bi-file-earmark-text si"></i>
   </div>
   <div class="stat o">
     <div class="sl">Pendientes</div>
     <div class="sv o">{{ pendientes }}</div>
-    <div class="ss">Sin técnico asignado</div>
+    <div class="ss">Sin técnico o sin iniciar</div>
     <i class="bi bi-hourglass-split si"></i>
   </div>
-  <div class="stat b">
+  <div class="stat r">
     <div class="sl">En proceso</div>
-    <div class="sv b">{{ en_proceso }}</div>
+    <div class="sv r">{{ en_proceso }}</div>
     <div class="ss">En reparación</div>
-    <i class="bi bi-gear si"></i>
+    <i class="bi bi-gear-fill si"></i>
   </div>
   <div class="stat g">
     <div class="sl">Finalizadas</div>
@@ -42,52 +168,101 @@
   </div>
 </div>
 
-<!-- TABLA Y TÉCNICOS -->
-<div class="two">
+<div class="two" style="margin-bottom:18px;">
+  <!-- CARGA POR TÉCNICO -->
+  <div class="card">
+    <div class="ct">👷 Carga de trabajo por técnico</div>
+    {% if carga_tecnicos %}
+    <div style="display:flex;flex-direction:column;gap:16px;">
+      {% for tec in carga_tecnicos %}
+      <div style="background:var(--surface);border:1px solid var(--border);
+        border-radius:var(--rs);padding:14px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="width:34px;height:34px;border-radius:50%;
+              background:linear-gradient(135deg,var(--accent),var(--teal));
+              display:flex;align-items:center;justify-content:center;
+              font-size:.8rem;font-weight:700;color:#0b0d12;">
+              {{ tec.nombre|first|upper }}
+            </div>
+            <div>
+              <div style="font-size:.88rem;font-weight:600;color:var(--t1);">{{ tec.nombre }}</div>
+              <div style="font-size:.72rem;color:var(--t3);">Técnico</div>
+            </div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-family:'JetBrains Mono',monospace;font-size:1.1rem;
+              font-weight:700;color:var(--accent);">{{ tec.trabajos }}</div>
+            <div style="font-size:.7rem;color:var(--t3);">trabajo(s)</div>
+          </div>
+        </div>
+        <!-- Barra de horas -->
+        <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+          <span style="font-size:.75rem;color:var(--t3);">Carga estimada</span>
+          <span style="font-family:'JetBrains Mono',monospace;font-size:.78rem;
+            color:{% if tec.horas <= 3 %}var(--success){% elif tec.horas <= 6 %}var(--warn){% else %}var(--danger){% endif %};">
+            {{ tec.horas }} hora(s)
+          </span>
+        </div>
+        <div style="height:6px;background:var(--border);border-radius:3px;">
+          <div style="height:100%;
+            width:{% if tec.horas == 0 %}0{% elif tec.horas >= 10 %}100{% else %}{{ tec.horas }}0{% endif %}%;
+            max-width:100%;border-radius:3px;transition:.3s;
+            background:{% if tec.horas <= 3 %}var(--success){% elif tec.horas <= 6 %}var(--warn){% else %}var(--danger){% endif %};">
+          </div>
+        </div>
+        <div style="font-size:.68rem;color:var(--t3);margin-top:4px;">
+          {% if tec.trabajos == 0 %}Sin trabajos asignados — disponible
+          {% elif tec.horas <= 3 %}Carga baja
+          {% elif tec.horas <= 6 %}Carga media
+          {% else %}Carga alta{% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div style="text-align:center;padding:20px;color:var(--t3);">
+      <i class="bi bi-person-slash" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+      No hay técnicos registrados aún.
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- SOLICITUDES RECIENTES -->
   <div class="card">
     <div class="ct">Solicitudes recientes</div>
     {% if recientes %}
-    <div class="tw">
-      <table>
-        <thead>
-          <tr>
-            <th>Código</th>
-            <th>Cliente</th>
-            <th>Equipo</th>
-            <th>Estado</th>
-            <th>Prioridad</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for sol in recientes %}
-          <tr>
-            <td><strong class="mono acc">#S-{{ sol.id }}</strong></td>
-            <td><strong>{{ sol.cliente.nombre }}</strong></td>
-            <td>{{ sol.equipo.marca }} {{ sol.equipo.modelo }}</td>
-            <td>
-              {% if sol.estado == 'pendiente' %}
-                <span class="badge bp">Pendiente</span>
-              {% elif sol.estado == 'proceso' %}
-                <span class="badge bpr">En proceso</span>
-              {% elif sol.estado == 'finalizado' %}
-                <span class="badge bf">Finalizado</span>
-              {% else %}
-                <span class="badge">{{ sol.get_estado_display }}</span>
-              {% endif %}
-            </td>
-            <td>
-              {% if sol.prioridad == 'alta' %}
-                <span class="badge bh">Alta</span>
-              {% elif sol.prioridad == 'media' %}
-                <span class="badge bm">Media</span>
-              {% else %}
-                <span class="badge bl">Baja</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div style="display:flex;flex-direction:column;gap:0;">
+      {% for sol in recientes %}
+      <a href="{% url 'detalle_solicitud' sol.pk %}"
+        style="display:flex;justify-content:space-between;align-items:center;
+        padding:10px 4px;border-bottom:1px solid var(--border);
+        text-decoration:none;transition:.12s;"
+        onmouseover="this.style.background='var(--hover)'"
+        onmouseout="this.style.background='transparent'">
+        <div>
+          <div style="font-size:.83rem;font-weight:600;color:var(--t1);">
+            <span class="mono acc">#S-{{ sol.id }}</span> — {{ sol.cliente.nombre }}
+          </div>
+          <div style="font-size:.72rem;color:var(--t3);">
+            {{ sol.equipo.get_marca_display }} {{ sol.equipo.modelo }}
+            {% if sol.detalle.tecnico %}· {{ sol.detalle.tecnico.get_full_name|default:sol.detalle.tecnico.username }}{% endif %}
+          </div>
+        </div>
+        <div style="text-align:right;">
+          {% if sol.estado == 'pendiente' %}<span class="badge bp">Pendiente</span>
+          {% elif sol.estado == 'proceso' %}<span class="badge bpr">En proceso</span>
+          {% elif sol.estado == 'finalizado' %}<span class="badge bf">Finalizado</span>
+          {% elif sol.estado == 'entregado' %}<span class="badge" style="background:var(--tg);color:var(--teal);">Entregado</span>
+          {% endif %}
+          {% if sol.tiempo_estimado_texto %}
+          <div style="font-size:.7rem;color:var(--t3);margin-top:2px;">
+            {{ sol.tiempo_estimado_texto }}
+          </div>
+          {% endif %}
+        </div>
+      </a>
+      {% endfor %}
     </div>
     {% else %}
     <div style="text-align:center;padding:30px;color:var(--t3);">
@@ -96,34 +271,7 @@
     </div>
     {% endif %}
   </div>
-
-  <div class="card">
-    <div class="ct">Técnicos del taller</div>
-    {% if tecnicos %}
-    <div style="display:flex;flex-direction:column;gap:12px;">
-      {% for tec in tecnicos %}
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="width:32px;height:32px;border-radius:50%;
-          background:linear-gradient(135deg,var(--accent),var(--teal));
-          display:flex;align-items:center;justify-content:center;
-          font-size:.75rem;font-weight:700;flex-shrink:0;">
-          {{ tec.username|first|upper }}
-        </div>
-        <div>
-          <div style="font-size:.83rem;font-weight:600;">
-            {{ tec.get_full_name|default:tec.username }}
-          </div>
-          <div style="font-size:.72rem;color:var(--t3);">Técnico</div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% else %}
-    <div style="text-align:center;padding:30px;color:var(--t3);">
-      <i class="bi bi-people" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
-      No hay técnicos registrados aún.
-    </div>
-    {% endif %}
-  </div>
 </div>
+{% endif %}
+
 {% endblock %}

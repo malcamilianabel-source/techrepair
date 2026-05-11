@@ -38,30 +38,79 @@ def logout_view(request):
     return redirect('login')
 
 
-# ── DASHBOARD ──────────────────────────────────────────────────
+# ── DASHBOARD ─────────────────────────────────────────────────
 @login_required(login_url='login')
 def dashboard(request):
-    total_solicitudes  = Solicitud.objects.count()
-    pendientes         = Solicitud.objects.filter(estado='pendiente').count()
-    en_proceso         = Solicitud.objects.filter(estado='proceso').count()
-    finalizadas        = Solicitud.objects.filter(estado='finalizado').count()
-    recientes          = Solicitud.objects.select_related(
-                            'cliente', 'equipo'
-                         ).order_by('-creado_en')[:5]
-    tecnicos           = Usuario.objects.filter(rol='tec')
+    import re
 
-    context = {
-        'total_solicitudes': total_solicitudes,
-        'pendientes':        pendientes,
-        'en_proceso':        en_proceso,
-        'finalizadas':       finalizadas,
-        'recientes':         recientes,
-        'tecnicos':          tecnicos,
-    }
-    return render(request, 'core/dashboard.html', context)
+    if request.user.rol == 'tec':
+        # Dashboard del técnico — solo sus solicitudes
+        mis_solicitudes = Solicitud.objects.filter(
+            detalle__tecnico=request.user
+        ).select_related('cliente', 'equipo').order_by('-creado_en')
 
-    from django.contrib import messages
-from .forms import ClienteForm
+        pendientes  = mis_solicitudes.filter(estado='pendiente').count()
+        en_proceso  = mis_solicitudes.filter(estado='proceso').count()
+        finalizadas = mis_solicitudes.filter(estado='finalizado').count()
+
+        # Calcular horas de carga personal
+        activas = mis_solicitudes.filter(estado__in=['pendiente', 'proceso'])
+        total_horas = 0
+        for sol in activas:
+            if sol.tiempo_estimado_texto:
+                m = re.search(r'\d+', sol.tiempo_estimado_texto)
+                if m:
+                    total_horas += int(m.group())
+
+        return render(request, 'core/dashboard.html', {
+            'mis_solicitudes': mis_solicitudes[:8],
+            'pendientes':      pendientes,
+            'en_proceso':      en_proceso,
+            'finalizadas':     finalizadas,
+            'total_horas':     total_horas,
+            'total_activas':   activas.count(),
+        })
+
+    else:
+        # Dashboard del admin/recepcionista
+        total_sol   = Solicitud.objects.count()
+        pendientes  = Solicitud.objects.filter(estado='pendiente').count()
+        en_proceso  = Solicitud.objects.filter(estado='proceso').count()
+        finalizadas = Solicitud.objects.filter(estado='finalizado').count()
+
+        # Carga por técnico con horas
+        tecnicos = Usuario.objects.filter(rol='tec')
+        carga_tecnicos = []
+        for tec in tecnicos:
+            sols = Solicitud.objects.filter(
+                detalle__tecnico=tec,
+                estado__in=['pendiente', 'proceso']
+            )
+            total_trabajos = sols.count()
+            total_horas = 0
+            for sol in sols:
+                if sol.tiempo_estimado_texto:
+                    m = re.search(r'\d+', sol.tiempo_estimado_texto)
+                    if m:
+                        total_horas += int(m.group())
+            carga_tecnicos.append({
+                'nombre':   tec.get_full_name() or tec.username,
+                'trabajos': total_trabajos,
+                'horas':    total_horas,
+            })
+
+        recientes = Solicitud.objects.select_related(
+            'cliente', 'equipo', 'detalle__tecnico'
+        ).order_by('-creado_en')[:8]
+
+        return render(request, 'core/dashboard.html', {
+            'total_sol':      total_sol,
+            'pendientes':     pendientes,
+            'en_proceso':     en_proceso,
+            'finalizadas':    finalizadas,
+            'carga_tecnicos': carga_tecnicos,
+            'recientes':      recientes,
+        })
 
 
 # ── LISTAR CLIENTES ────────────────────────────────────────────
@@ -279,6 +328,9 @@ def cambiar_estado(request, pk):
     if request.method == 'POST':
         form = CambiarEstadoForm(request.POST)
         if form.is_valid():
+            if request.user.rol == 'tec' and form.cleaned_data['estado'] == 'entregado':
+                messages.error(request, 'Los técnicos no pueden marcar como Entregado.')
+                return redirect('detalle_solicitud', pk=pk)
             estado_antes         = solicitud.estado
             solicitud.estado     = form.cleaned_data['estado']
             solicitud.save()
@@ -293,6 +345,12 @@ def cambiar_estado(request, pk):
             return redirect('detalle_solicitud', pk=pk)
     else:
         form = CambiarEstadoForm(initial={'estado': solicitud.estado})
+        if request.user.rol == 'tec':
+            form.fields['estado'].choices = [
+                ('pendiente',  'Pendiente'),
+                ('proceso',    'En proceso'),
+                ('finalizado', 'Finalizado'),
+            ]
     return render(request, 'core/solicitudes/cambiar_estado.html', {
         'form':      form,
         'solicitud': solicitud,
@@ -741,3 +799,46 @@ def eliminar_solicitud(request, pk):
         messages.success(request, f'Solicitud #S-{pk} eliminada correctamente.')
         return redirect('consultar_solicitudes')
     return render(request, 'core/solicitudes/eliminar.html', {'solicitud': solicitud})
+    # ── MARCAR COMO PRIORITARIA ────────────────────────────────────
+@login_required(login_url='login')
+def marcar_prioritaria(request, pk):
+    if request.method == 'POST':
+        solicitud = Solicitud.objects.get(pk=pk)
+        solicitud.prioridad = 'alta'
+        solicitud.save()
+        messages.success(request, f'Solicitud #S-{pk} marcada como prioritaria.')
+    return redirect('consultar_solicitudes')
+
+
+# ── REASIGNAR TÉCNICO ──────────────────────────────────────────
+@login_required(login_url='login')
+def reasignar_tecnico(request, pk):
+    solicitud = Solicitud.objects.get(pk=pk)
+    detalle, _ = DetalleSolicitud.objects.get_or_create(solicitud=solicitud)
+    tecnico_actual = detalle.tecnico
+
+    if request.method == 'POST':
+        form = AsignarTecnicoForm(request.POST)
+        if form.is_valid():
+            tecnico_nuevo = form.cleaned_data['tecnico']
+            detalle.tecnico = tecnico_nuevo
+            detalle.save()
+            HistorialEstado.objects.create(
+                solicitud    = solicitud,
+                usuario      = request.user,
+                estado_antes = solicitud.estado,
+                estado_nuevo = solicitud.estado,
+                observacion  = f'Técnico reasignado de '
+                               f'{tecnico_actual.get_full_name() if tecnico_actual else "Sin asignar"} '
+                               f'a {tecnico_nuevo.get_full_name()}'
+            )
+            messages.success(request, 'Técnico reasignado correctamente.')
+            return redirect('detalle_solicitud', pk=pk)
+    else:
+        form = AsignarTecnicoForm()
+
+    return render(request, 'core/solicitudes/reasignar_tecnico.html', {
+        'form':           form,
+        'solicitud':      solicitud,
+        'tecnico_actual': tecnico_actual,
+    })

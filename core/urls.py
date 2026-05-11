@@ -31,6 +31,8 @@ urlpatterns = [
     path('solicitudes/<int:pk>/entrega/', views.entrega, name='entrega'),
     path('solicitudes/<int:pk>/pdf/', views.informe_pdf, name='informe_pdf'),
     path('solicitudes/<int:pk>/eliminar/', views.eliminar_solicitud, name='eliminar_solicitud'),
+    path('solicitudes/<int:pk>/prioritaria/', views.marcar_prioritaria, name='marcar_prioritaria'),
+    path('solicitudes/<int:pk>/reasignar/', views.reasignar_tecnico, name='reasignar_tecnico'),
 
     # ── USUARIOS ──
     path('usuarios/registrar/', views.registrar_usuario, name='registrar_usuario'),
