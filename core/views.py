@@ -799,14 +799,14 @@ def eliminar_solicitud(request, pk):
         messages.success(request, f'Solicitud #S-{pk} eliminada correctamente.')
         return redirect('consultar_solicitudes')
     return render(request, 'core/solicitudes/eliminar.html', {'solicitud': solicitud})
+    
     # ── MARCAR COMO PRIORITARIA ────────────────────────────────────
 @login_required(login_url='login')
 def marcar_prioritaria(request, pk):
-    if request.method == 'POST':
-        solicitud = Solicitud.objects.get(pk=pk)
-        solicitud.prioridad = 'alta'
-        solicitud.save()
-        messages.success(request, f'Solicitud #S-{pk} marcada como prioritaria.')
+    solicitud = Solicitud.objects.get(pk=pk)
+    solicitud.prioridad = 'alta'
+    solicitud.save()
+    messages.success(request, f'Solicitud #S-{pk} marcada como prioritaria.')
     return redirect('consultar_solicitudes')
 
 
