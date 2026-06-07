@@ -75,17 +75,12 @@
               class="btn btn-o btn-sm">
               <i class="bi bi-pencil"></i>
             </a>
-          </td>
-          <td style="display:flex;gap:6px;">
-  <a href="{% url 'historial_cliente' cliente.pk %}"
+            <a href="{% url 'historial_cliente' cliente.pk %}"
      class="btn btn-o btn-sm" title="Ver historial">
     <i class="bi bi-clock-history"></i>
   </a>
-  <a href="{% url 'actualizar_cliente' cliente.pk %}"
-     class="btn btn-o btn-sm">
-    <i class="bi bi-pencil"></i>
-  </a>
-</td>
+          </td>
+          
         </tr>
         {% empty %}
         <tr>
