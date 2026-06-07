@@ -172,7 +172,16 @@ textarea.fc{resize:vertical;min-height:80px;}
   </a>
   <div class="sb-sect">Reportes</div>
   <a href="{% url 'reportes' %}" class="sb-item {% if request.resolver_match.url_name == 'reportes' %}on{% endif %}">
-    <i class="bi bi-bar-chart-fill"></i> Reportes
+    <i class="bi bi-bar-chart-fill"></i> Centro de Reportes
+  </a>
+  <a href="{% url 'reporte_solicitudes' %}" class="sb-item {% if request.resolver_match.url_name == 'reporte_solicitudes' %}on{% endif %}">
+    <i class="bi bi-clipboard-data"></i> Solicitudes
+  </a>
+  <a href="{% url 'reporte_tiempos' %}" class="sb-item {% if request.resolver_match.url_name == 'reporte_tiempos' %}on{% endif %}">
+    <i class="bi bi-stopwatch"></i> Tiempos
+  </a>
+  <a href="{% url 'reporte_ingresos' %}" class="sb-item {% if request.resolver_match.url_name == 'reporte_ingresos' %}on{% endif %}">
+    <i class="bi bi-cash-stack"></i> Ingresos
   </a>
   <div class="sb-sect">Entregas</div>
   <a href="{% url 'consultar_solicitudes' %}?estado=finalizado" class="sb-item {% if request.resolver_match.url_name == 'entrega' %}on{% endif %}">
@@ -202,9 +211,15 @@ textarea.fc{resize:vertical;min-height:80px;}
   <a href="{% url 'consultar_solicitudes' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_solicitudes' %}on{% endif %}">
     <i class="bi bi-card-list"></i> Consultar Solicitudes
   </a>
-  <div class="sb-sect">Reportes</div>
+ <div class="sb-sect">Reportes</div>
   <a href="{% url 'reportes' %}" class="sb-item {% if request.resolver_match.url_name == 'reportes' %}on{% endif %}">
-    <i class="bi bi-bar-chart-fill"></i> Reportes
+    <i class="bi bi-bar-chart-fill"></i> Centro de Reportes
+  </a>
+  <a href="{% url 'reporte_solicitudes' %}" class="sb-item {% if request.resolver_match.url_name == 'reporte_solicitudes' %}on{% endif %}">
+    <i class="bi bi-clipboard-data"></i> Solicitudes
+  </a>
+  <a href="{% url 'reporte_tiempos' %}" class="sb-item {% if request.resolver_match.url_name == 'reporte_tiempos' %}on{% endif %}">
+    <i class="bi bi-stopwatch"></i> Tiempos
   </a>
   <div class="sb-sect">Entregas</div>
   <a href="{% url 'consultar_solicitudes' %}?estado=finalizado" class="sb-item {% if request.resolver_match.url_name == 'entrega' %}on{% endif %}">

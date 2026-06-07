@@ -1,180 +1,83 @@
 {% extends 'core/base.html' %}
-
 {% block title %}Reportes{% endblock %}
-
 {% block content %}
 <div class="bc">Inicio / <span>Reportes</span></div>
-<div style="margin-bottom:20px;">
+<div style="margin-bottom:24px;">
   <div class="pt">
-    <div class="pt-ic" style="background:var(--pg);color:var(--purple);">
+    <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
       <i class="bi bi-bar-chart-fill"></i>
     </div>
     Centro de Reportes
   </div>
-  <div class="ps">Estadísticas y análisis del taller</div>
+  <div class="ps">Selecciona el reporte que deseas visualizar</div>
 </div>
 
-<!-- STATS PRINCIPALES -->
-<div class="grid4" style="margin-bottom:18px;">
-  <div class="stat b">
-    <div class="sl">Total solicitudes</div>
-    <div class="sv b">{{ total_sol }}</div>
-    <div class="ss">Todas las registradas</div>
-    <i class="bi bi-file-earmark-text si"></i>
-  </div>
-  <div class="stat o">
-    <div class="sl">Pendientes</div>
-    <div class="sv o">{{ pendientes }}</div>
-    <div class="ss">Sin iniciar</div>
-    <i class="bi bi-hourglass-split si"></i>
-  </div>
-  <div class="stat g">
-    <div class="sl">Finalizadas</div>
-    <div class="sv g">{{ finalizadas }}</div>
-    <div class="ss">Completadas</div>
-    <i class="bi bi-check-circle si"></i>
-  </div>
-  <div class="stat r">
-    <div class="sl">Tiempo promedio</div>
-    <div class="sv r">{{ promedio_dias }}h</div>
-    <div class="ss">horas promedio estimadas</div>
-    <i class="bi bi-clock si"></i>
-  </div>
-</div>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px;">
 
-<div class="two" style="margin-bottom:18px;">
-  <!-- INGRESOS -->
-  <div class="card">
-    <div class="ct">💰 Ingresos del taller</div>
-    <div style="display:flex;flex-direction:column;gap:0;">
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);">
-        <span style="font-size:.85rem;color:var(--t2);">Total ingresos</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-weight:700;color:var(--success);">
-          S/. {{ total_ingresos }}</span>
+  <a href="{% url 'reporte_solicitudes' %}" style="text-decoration:none;">
+    <div class="card" style="padding:24px;cursor:pointer;transition:border-color .2s;
+      border:1px solid var(--border);" onmouseover="this.style.borderColor='#2E74B5'"
+      onmouseout="this.style.borderColor='var(--border)'">
+      <div style="width:48px;height:48px;border-radius:12px;background:rgba(46,116,181,.15);
+        display:flex;align-items:center;justify-content:center;
+        font-size:1.4rem;color:#2E74B5;margin-bottom:14px;">
+        <i class="bi bi-clipboard-data"></i>
       </div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;border-bottom:1px solid var(--border);">
-        <span style="font-size:.85rem;color:var(--t2);">Mano de obra</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-weight:700;">
-          S/. {{ total_mano_obra }}</span>
+      <div style="font-size:1rem;font-weight:700;color:var(--t1);margin-bottom:6px;">
+        Reporte de Solicitudes
       </div>
-      <div style="display:flex;justify-content:space-between;padding:12px 0;">
-        <span style="font-size:.85rem;color:var(--t2);">Repuestos</span>
-        <span style="font-family:'JetBrains Mono',monospace;font-weight:700;">
-          S/. {{ total_ingresos|floatformat:2 }}</span>
+      <div style="font-size:.82rem;color:var(--t3);">
+        Estadísticas por estado, tipo de reparación y técnico asignado.
+      </div>
+      <div style="margin-top:14px;font-size:.8rem;color:#2E74B5;font-weight:600;">
+        Ver reporte <i class="bi bi-arrow-right"></i>
       </div>
     </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;
-      padding:14px;background:var(--sg);border:1px solid rgba(61,214,140,.25);
-      border-radius:var(--rs);margin-top:12px;">
-      <span style="font-weight:700;">Total generado</span>
-      <span style="font-family:'JetBrains Mono',monospace;color:var(--success);font-size:1.2rem;font-weight:700;">
-        S/. {{ total_ingresos }}</span>
-    </div>
-  </div>
+  </a>
 
-  <!-- CARGA POR TÉCNICO -->
-  <div class="card">
-    <div class="ct">👷 Carga por técnico</div>
-    {% if carga_tecnicos %}
-    <div style="display:flex;flex-direction:column;gap:14px;">
-      {% for tec in carga_tecnicos %}
-      <div>
-        <div style="display:flex;justify-content:space-between;margin-bottom:6px;">
-          <span style="font-size:.85rem;font-weight:600;">{{ tec.nombre }}</span>
-          <span style="font-family:'JetBrains Mono',monospace;font-size:.85rem;color:var(--accent);">
-            {{ tec.cantidad }} trabajo(s)</span>
-        </div>
-        <div style="height:6px;background:var(--border);border-radius:3px;">
-          <div style="height:100%;width:{% if tec.cantidad > 0 %}{{ tec.cantidad }}0{% else %}0{% endif %}%;
-            max-width:100%;background:var(--accent);border-radius:3px;"></div>
-        </div>
+  <a href="{% url 'reporte_tiempos' %}" style="text-decoration:none;">
+    <div class="card" style="padding:24px;cursor:pointer;transition:border-color .2s;
+      border:1px solid var(--border);" onmouseover="this.style.borderColor='#00836A'"
+      onmouseout="this.style.borderColor='var(--border)'">
+      <div style="width:48px;height:48px;border-radius:12px;background:rgba(0,131,106,.15);
+        display:flex;align-items:center;justify-content:center;
+        font-size:1.4rem;color:#00836A;margin-bottom:14px;">
+        <i class="bi bi-stopwatch"></i>
       </div>
-      {% endfor %}
+      <div style="font-size:1rem;font-weight:700;color:var(--t1);margin-bottom:6px;">
+        Reporte de Tiempos
+      </div>
+      <div style="font-size:.82rem;color:var(--t3);">
+        Tiempos promedio de reparación por tipo y estadísticas generales.
+      </div>
+      <div style="margin-top:14px;font-size:.8rem;color:#00836A;font-weight:600;">
+        Ver reporte <i class="bi bi-arrow-right"></i>
+      </div>
     </div>
-    {% else %}
-    <div style="text-align:center;padding:20px;color:var(--t3);">
-      No hay técnicos registrados.
+  </a>
+
+  {% if request.user.rol == 'admin' %}
+  <a href="{% url 'reporte_ingresos' %}" style="text-decoration:none;">
+    <div class="card" style="padding:24px;cursor:pointer;transition:border-color .2s;
+      border:1px solid var(--border);" onmouseover="this.style.borderColor='var(--accent)'"
+      onmouseout="this.style.borderColor='var(--border)'">
+      <div style="width:48px;height:48px;border-radius:12px;background:var(--ag);
+        display:flex;align-items:center;justify-content:center;
+        font-size:1.4rem;color:var(--accent);margin-bottom:14px;">
+        <i class="bi bi-cash-stack"></i>
+      </div>
+      <div style="font-size:1rem;font-weight:700;color:var(--t1);margin-bottom:6px;">
+        Reporte de Ingresos
+      </div>
+      <div style="font-size:.82rem;color:var(--t3);">
+        Ingresos totales, mano de obra y repuestos. Solo administrador.
+      </div>
+      <div style="margin-top:14px;font-size:.8rem;color:var(--accent);font-weight:600;">
+        Ver reporte <i class="bi bi-arrow-right"></i>
+      </div>
     </div>
-    {% endif %}
-  </div>
-</div>
+  </a>
+  {% endif %}
 
-<!-- TIPOS DE REPARACIÓN -->
-<div class="card" style="margin-bottom:18px;">
-  <div class="ct">🔧 Solicitudes por tipo de reparación</div>
-  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;">
-    {% for tipo, cantidad in tipos.items %}
-    <div style="background:var(--surface);border:1px solid var(--border);
-      border-radius:var(--rs);padding:14px;text-align:center;">
-      <div style="font-size:1.6rem;font-weight:700;font-family:'JetBrains Mono',monospace;
-        color:var(--accent);">{{ cantidad }}</div>
-      <div style="font-size:.75rem;color:var(--t2);margin-top:4px;">{{ tipo }}</div>
-    </div>
-    {% endfor %}
-  </div>
 </div>
-
-<!-- SOLICITUDES RECIENTES -->
-<div class="card">
-  <div class="ct">📋 Últimas 10 solicitudes</div>
-  <div class="tw">
-    <table>
-      <thead>
-        <tr>
-          <th>Código</th>
-          <th>Cliente</th>
-          <th>Equipo</th>
-          <th>Técnico</th>
-          <th>Estado</th>
-          <th>Prioridad</th>
-          <th>T. Estimado</th>
-          <th>Fecha</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for sol in recientes %}
-        <tr>
-          <td><strong class="mono acc">#S-{{ sol.id }}</strong></td>
-          <td><strong>{{ sol.cliente.nombre }}</strong></td>
-          <td>{{ sol.equipo.get_marca_display }} {{ sol.equipo.modelo }}</td>
-          <td>
-            {% if sol.detalle.tecnico %}
-              {{ sol.detalle.tecnico.get_full_name|default:sol.detalle.tecnico.username }}
-            {% else %}
-              <span style="color:var(--t3);">Sin asignar</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if sol.estado == 'pendiente' %}<span class="badge bp">Pendiente</span>
-            {% elif sol.estado == 'proceso' %}<span class="badge bpr">En proceso</span>
-            {% elif sol.estado == 'finalizado' %}<span class="badge bf">Finalizado</span>
-            {% else %}<span class="badge">{{ sol.get_estado_display }}</span>{% endif %}
-          </td>
-          <td>
-            {% if sol.prioridad == 'alta' %}<span class="badge bh">Alta</span>
-            {% elif sol.prioridad == 'media' %}<span class="badge bm">Media</span>
-            {% else %}<span class="badge bl">Baja</span>{% endif %}
-          </td>
-          <td class="mono">
-            {% if sol.dias_estimados %}
-              <span style="color:var(--accent);">{{ sol.dias_estimados }} día(s)</span>
-            {% else %}—{% endif %}
-          </td>
-          <td style="font-size:.78rem;color:var(--t3);">{{ sol.fecha_ingreso }}</td>
-        </tr>
-        {% empty %}
-        <tr>
-          <td colspan="8" style="text-align:center;padding:30px;color:var(--t3);">
-            No hay solicitudes registradas.
-          </td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table>
-  </div>
-</div>
-
-<style>
-:root{--purple:#a78bfa;--pg:rgba(167,139,250,.12);}
-</style>
 {% endblock %}

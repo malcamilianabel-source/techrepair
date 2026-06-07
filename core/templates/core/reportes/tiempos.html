@@ -1,0 +1,59 @@
+{% extends 'core/base.html' %}
+{% block title %}Reporte de Tiempos{% endblock %}
+{% block content %}
+<div class="bc">Inicio / <a href="{% url 'reportes' %}">Reportes</a> / <span>Tiempos</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:rgba(0,131,106,.15);color:#00836A;">
+      <i class="bi bi-stopwatch"></i>
+    </div>
+    Reporte de Tiempos de Reparación
+  </div>
+  <div class="ps">Promedio general: {{ promedio_general }} hora(s) por solicitud</div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px;">
+  <div class="card" style="padding:18px;text-align:center;">
+    <div style="font-size:.75rem;color:var(--t3);text-transform:uppercase;">Promedio general</div>
+    <div style="font-size:2.2rem;font-weight:700;color:var(--accent);">{{ promedio_general }}h</div>
+  </div>
+  <div class="card" style="padding:18px;text-align:center;">
+    <div style="font-size:.75rem;color:var(--t3);text-transform:uppercase;">Total solicitudes</div>
+    <div style="font-size:2.2rem;font-weight:700;color:var(--accent);">{{ total_solicitudes }}</div>
+  </div>
+</div>
+
+<div class="card" style="padding:18px;">
+  <div style="font-weight:700;color:var(--t1);margin-bottom:14px;">
+    <i class="bi bi-clock" style="color:#00836A;"></i> Tiempos por tipo de reparación
+  </div>
+  <div class="tw"><table>
+    <thead>
+      <tr>
+        <th>Tipo</th>
+        <th>Solicitudes</th>
+        <th>Total horas estimadas</th>
+        <th>Promedio por solicitud</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for tipo, datos in tiempos_por_tipo.items %}
+      <tr>
+        <td><strong>{{ tipo }}</strong></td>
+        <td>{{ datos.cantidad }}</td>
+        <td>{{ datos.total_horas }}h</td>
+        <td>
+          <strong class="acc">{{ datos.promedio }}h</strong>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+
+<div style="margin-top:16px;">
+  <a href="{% url 'reportes' %}" class="btn btn-o">
+    <i class="bi bi-arrow-left"></i> Volver a Reportes
+  </a>
+</div>
+{% endblock %}

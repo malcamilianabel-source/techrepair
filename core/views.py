@@ -479,67 +479,117 @@ def costos(request, pk):
         'costo':     costo,
     })
 
-    # ── REPORTES ───────────────────────────────────────────────────
+    # ── REPORTES — ÍNDICE ──────────────────────────────────────────
 @login_required(login_url='login')
 def reportes(request):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('dashboard')
+    return render(request, 'core/reportes/index.html', {})
 
-    # Estadísticas generales
-    total_sol      = Solicitud.objects.count()
-    pendientes     = Solicitud.objects.filter(estado='pendiente').count()
-    en_proceso     = Solicitud.objects.filter(estado='proceso').count()
-    finalizadas    = Solicitud.objects.filter(estado='finalizado').count()
-    entregadas     = Solicitud.objects.filter(estado='entregado').count()
 
-    # Solicitudes por tipo
+# ── REPORTE SOLICITUDES ────────────────────────────────────────
+@login_required(login_url='login')
+def reporte_solicitudes(request):
+    if request.user.rol not in ['admin', 'recep']:
+        return redirect('dashboard')
+
+    total    = Solicitud.objects.count()
+    estados  = {
+        'Pendiente':   Solicitud.objects.filter(estado='pendiente').count(),
+        'En proceso':  Solicitud.objects.filter(estado='proceso').count(),
+        'Finalizado':  Solicitud.objects.filter(estado='finalizado').count(),
+        'Entregado':   Solicitud.objects.filter(estado='entregado').count(),
+    }
     tipos = {}
     for t, label in Solicitud.TIPOS_REP:
         tipos[label] = Solicitud.objects.filter(tipo_reparacion=t).count()
 
-    # Solicitudes por técnico
-    tecnicos = Usuario.objects.filter(rol='tec')
-    carga_tecnicos = []
-    for tec in tecnicos:
+    por_tecnico = []
+    for tec in Usuario.objects.filter(rol='tec'):
         cant = DetalleSolicitud.objects.filter(tecnico=tec).count()
-        carga_tecnicos.append({
-            'nombre': tec.get_full_name() or tec.username,
+        por_tecnico.append({
+            'nombre':   tec.get_full_name() or tec.username,
             'cantidad': cant,
         })
 
-    # Ingresos totales
-    from .models import Costo
-    costos = Costo.objects.all()
-    total_ingresos   = sum(c.total for c in costos)
-    total_mano_obra  = sum(c.mano_obra for c in costos)
-
-    # Tiempos promedio
-    sols_con_tiempo = Solicitud.objects.filter(
-        dias_estimados__isnull=False)
-    if sols_con_tiempo.exists():
-        promedio_dias = sum(
-            s.dias_estimados for s in sols_con_tiempo
-        ) / sols_con_tiempo.count()
-    else:
-        promedio_dias = 0
-
-    # Solicitudes recientes
     recientes = Solicitud.objects.select_related(
         'cliente', 'equipo', 'detalle__tecnico'
     ).order_by('-creado_en')[:10]
 
-    return render(request, 'core/reportes/index.html', {
-        'total_sol':      total_sol,
-        'pendientes':     pendientes,
-        'en_proceso':     en_proceso,
-        'finalizadas':    finalizadas,
-        'entregadas':     entregadas,
-        'tipos':          tipos,
-        'carga_tecnicos': carga_tecnicos,
-        'total_ingresos': total_ingresos,
-        'total_mano_obra':total_mano_obra,
-        'promedio_dias':  round(promedio_dias, 1),
-        'recientes':      recientes,
+    return render(request, 'core/reportes/solicitudes.html', {
+        'total':       total,
+        'estados':     estados,
+        'tipos':       tipos,
+        'por_tecnico': por_tecnico,
+        'recientes':   recientes,
+    })
+
+
+# ── REPORTE TIEMPOS ────────────────────────────────────────────
+@login_required(login_url='login')
+def reporte_tiempos(request):
+    if request.user.rol not in ['admin', 'recep']:
+        return redirect('dashboard')
+
+    import re
+    tiempos_por_tipo = {}
+    for t, label in Solicitud.TIPOS_REP:
+        sols = Solicitud.objects.filter(tipo_reparacion=t)
+        total_horas = 0
+        count = 0
+        for s in sols:
+            if s.tiempo_estimado_texto:
+                m = re.search(r'\d+', s.tiempo_estimado_texto)
+                if m:
+                    total_horas += int(m.group())
+                    count += 1
+        promedio = round(total_horas / count, 1) if count else 0
+        tiempos_por_tipo[label] = {
+            'cantidad': sols.count(),
+            'promedio': promedio,
+            'total_horas': total_horas,
+        }
+
+    sols_con_tiempo = [
+        s for s in Solicitud.objects.all()
+        if s.tiempo_estimado_texto and re.search(r'\d+', s.tiempo_estimado_texto)
+    ]
+    promedio_general = 0
+    if sols_con_tiempo:
+        total = sum(
+            int(re.search(r'\d+', s.tiempo_estimado_texto).group())
+            for s in sols_con_tiempo
+        )
+        promedio_general = round(total / len(sols_con_tiempo), 1)
+
+    return render(request, 'core/reportes/tiempos.html', {
+        'tiempos_por_tipo': tiempos_por_tipo,
+        'promedio_general': promedio_general,
+        'total_solicitudes': Solicitud.objects.count(),
+    })
+
+
+# ── REPORTE INGRESOS ───────────────────────────────────────────
+@login_required(login_url='login')
+def reporte_ingresos(request):
+    if request.user.rol != 'admin':
+        return redirect('dashboard')
+
+    costos = Costo.objects.select_related('solicitud__cliente').all()
+    total_ingresos  = sum(c.total      for c in costos)
+    total_mano_obra = sum(c.mano_obra  for c in costos)
+    total_repuestos = total_ingresos - total_mano_obra
+
+    ultimos = Costo.objects.select_related(
+        'solicitud__cliente', 'solicitud__equipo'
+    ).order_by('-solicitud__creado_en')[:10]
+
+    return render(request, 'core/reportes/ingresos.html', {
+        'total_ingresos':  total_ingresos,
+        'total_mano_obra': total_mano_obra,
+        'total_repuestos': total_repuestos,
+        'ultimos':         ultimos,
+        'total_registros': costos.count(),
     })
 
     # ── API: EQUIPOS POR CLIENTE ───────────────────────────────────
