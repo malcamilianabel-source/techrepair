@@ -62,6 +62,7 @@
           <th>Estado</th>
           <th>Cliente</th>
           <th>Falla</th>
+          <th>Acciones</th>
         </tr>
       </thead>
       <tbody>
@@ -84,6 +85,12 @@
           <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
             {{ equipo.falla|default:"—" }}
           </td>
+          <td>                             
+    <a href="{% url 'historial_equipo' equipo.pk %}"
+       class="btn btn-o btn-sm" title="Ver historial">
+      <i class="bi bi-clock-history"></i>
+    </a>
+  </td>
         </tr>
         {% empty %}
         <tr>

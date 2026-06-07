@@ -13,10 +13,12 @@ urlpatterns = [
     path('clientes/', views.consultar_clientes, name='consultar_clientes'),
     path('clientes/registrar/', views.registrar_cliente, name='registrar_cliente'),
     path('clientes/actualizar/<int:pk>/', views.actualizar_cliente, name='actualizar_cliente'),
+    path('clientes/<int:pk>/historial/', views.historial_cliente, name='historial_cliente'),
 
     # ── EQUIPOS ──
     path('equipos/', views.consultar_equipos, name='consultar_equipos'),
     path('equipos/registrar/', views.registrar_equipo, name='registrar_equipo'),
+    path('equipos/<int:pk>/historial/', views.historial_equipo, name='historial_equipo'),
 
     # ── SOLICITUDES ──
     path('solicitudes/', views.consultar_solicitudes, name='consultar_solicitudes'),

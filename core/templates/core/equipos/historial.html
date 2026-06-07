@@ -1,0 +1,153 @@
+{% extends 'core/base.html' %}
+
+{% block title %}Historial — {{ equipo.marca }} {{ equipo.modelo }}{% endblock %}
+
+{% block content %}
+<div class="bc">
+  Inicio / <a href="{% url 'consultar_equipos' %}">Equipos</a> /
+  <span>Historial de {{ equipo.marca }} {{ equipo.modelo }}</span>
+</div>
+
+<!-- CABECERA DEL EQUIPO -->
+<div style="background:var(--surface);border:1px solid var(--border);
+  border-radius:var(--rs);padding:18px 20px;margin-bottom:20px;
+  display:flex;align-items:center;gap:16px;">
+  <div style="width:48px;height:48px;border-radius:50%;
+    background:var(--ag);display:flex;align-items:center;
+    justify-content:center;font-size:1.3rem;color:var(--accent);flex-shrink:0;">
+    <i class="bi bi-pc-display"></i>
+  </div>
+  <div>
+    <div style="font-size:1.05rem;font-weight:700;color:var(--t1);">
+      {{ equipo.marca|upper }} {{ equipo.modelo }}
+    </div>
+    <div style="font-size:.80rem;color:var(--t3);margin-top:2px;display:flex;gap:16px;flex-wrap:wrap;">
+      <span><i class="bi bi-tag"></i> {{ equipo.get_tipo_display }}</span>
+      <span><i class="bi bi-upc-scan"></i> {{ equipo.serie }}</span>
+      <span><i class="bi bi-person"></i> {{ equipo.cliente.nombre }}</span>
+    </div>
+  </div>
+  <div style="margin-left:auto;text-align:right;">
+    <div style="font-size:1.4rem;font-weight:700;color:var(--accent);">
+      {{ solicitudes.count }}
+    </div>
+    <div style="font-size:.75rem;color:var(--t3);">reparación(es)</div>
+  </div>
+</div>
+
+<!-- TABLA -->
+<div style="margin-bottom:16px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
+      <i class="bi bi-clock-history"></i>
+    </div>
+    Historial de reparaciones
+  </div>
+  <div class="ps">Todas las reparaciones realizadas a este equipo</div>
+</div>
+
+<div class="card">
+  <div class="tw">
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Cliente</th>
+          <th>Tipo</th>
+          <th>Técnico</th>
+          <th>Estado</th>
+          <th>Ingreso</th>
+          <th>Entrega</th>
+          <th>Acciones</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for sol in solicitudes %}
+        <tr>
+          <td><strong class="mono acc">#S-{{ sol.id }}</strong></td>
+
+          <td>
+            <strong>{{ sol.cliente.nombre }}</strong>
+            <div style="font-size:.72rem;color:var(--t3);">
+              DNI: {{ sol.cliente.dni }}
+            </div>
+          </td>
+
+          <td>
+            <span style="background:var(--surface);border:1px solid var(--border);
+              border-radius:20px;padding:2px 10px;font-size:.72rem;color:var(--t2);">
+              {{ sol.get_tipo_reparacion_display }}
+            </span>
+          </td>
+
+          <td>
+            {% if sol.detalle and sol.detalle.tecnico %}
+              {{ sol.detalle.tecnico.get_full_name|default:sol.detalle.tecnico.username }}
+            {% else %}
+              <span style="color:var(--t3);">Sin asignar</span>
+            {% endif %}
+          </td>
+
+          <td>
+            {% if sol.estado == 'pendiente' %}
+              <span class="badge" style="background:rgba(239,159,39,.15);
+                color:#EF9F27;border:1px solid rgba(239,159,39,.3);">
+                <i class="bi bi-hourglass-split"></i> Pendiente
+              </span>
+            {% elif sol.estado == 'proceso' %}
+              <span class="badge" style="background:rgba(46,116,181,.15);
+                color:#2E74B5;border:1px solid rgba(46,116,181,.3);">
+                <i class="bi bi-tools"></i> En proceso
+              </span>
+            {% elif sol.estado == 'finalizado' %}
+              <span class="badge" style="background:rgba(29,158,117,.15);
+                color:var(--success);border:1px solid rgba(29,158,117,.3);">
+                <i class="bi bi-check-circle"></i> Finalizado
+              </span>
+            {% elif sol.estado == 'entregado' %}
+              <span class="badge" style="background:rgba(0,201,167,.15);
+                color:var(--accent);border:1px solid rgba(0,201,167,.3);">
+                <i class="bi bi-box-seam"></i> Entregado
+              </span>
+            {% endif %}
+          </td>
+
+          <td class="mono" style="font-size:.78rem;">
+            {{ sol.fecha_ingreso|date:"d/m/Y" }}
+          </td>
+
+          <td class="mono" style="font-size:.78rem;">
+            {% if sol.fecha_entrega %}
+              {{ sol.fecha_entrega|date:"d/m/Y" }}
+            {% else %}
+              <span style="color:var(--t3);">—</span>
+            {% endif %}
+          </td>
+
+          <td>
+            <a href="{% url 'detalle_solicitud' sol.pk %}"
+               class="btn btn-o btn-sm" title="Ver detalle">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" style="text-align:center;padding:40px;color:var(--t3);">
+            <i class="bi bi-clipboard-x"
+               style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+            Este equipo no tiene reparaciones registradas.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div style="margin-top:16px;">
+  <a href="{% url 'consultar_equipos' %}" class="btn btn-o">
+    <i class="bi bi-arrow-left"></i> Volver a Equipos
+  </a>
+</div>
+{% endblock %}

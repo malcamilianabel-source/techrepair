@@ -189,6 +189,9 @@ textarea.fc{resize:vertical;min-height:80px;}
     <i class="bi bi-person-lines-fill"></i> Consultar Clientes
   </a>
   <div class="sb-sect">Equipos</div>
+  <a href="{% url 'registrar_equipo' %}" class="sb-item {% if request.resolver_match.url_name == 'registrar_equipo' %}on{% endif %}">
+    <i class="bi bi-laptop-fill"></i> Registrar Equipo
+  </a>
   <a href="{% url 'consultar_equipos' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_equipos' %}on{% endif %}">
     <i class="bi bi-search"></i> Consultar Equipos
   </a>

@@ -842,3 +842,29 @@ def reasignar_tecnico(request, pk):
         'solicitud':      solicitud,
         'tecnico_actual': tecnico_actual,
     })
+
+    # ── HISTORIAL DEL CLIENTE ──────────────────────────────────────
+@login_required(login_url='login')
+def historial_cliente(request, pk):
+    from django.shortcuts import get_object_or_404
+    cliente    = get_object_or_404(Cliente, pk=pk)
+    solicitudes = Solicitud.objects.filter(
+        cliente=cliente
+    ).select_related('equipo', 'detalle__tecnico').order_by('-creado_en')
+    return render(request, 'core/clientes/historial.html', {
+        'cliente':     cliente,
+        'solicitudes': solicitudes,
+    })
+
+    # ── HISTORIAL DEL EQUIPO ───────────────────────────────────────
+@login_required(login_url='login')
+def historial_equipo(request, pk):
+    from django.shortcuts import get_object_or_404
+    equipo      = get_object_or_404(Equipo, pk=pk)
+    solicitudes = Solicitud.objects.filter(
+        equipo=equipo
+    ).select_related('cliente', 'detalle__tecnico').order_by('-creado_en')
+    return render(request, 'core/equipos/historial.html', {
+        'equipo':      equipo,
+        'solicitudes': solicitudes,
+    })
