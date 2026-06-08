@@ -5,37 +5,75 @@ from .models import Cliente, Equipo, Solicitud, Usuario, DetalleSolicitud, Avanc
 class ClienteForm(forms.ModelForm):
     class Meta:
         model  = Cliente
-        fields = ['nombre', 'dni', 'telefono', 'direccion', 'correo']
+        fields = ['nombre', 'apellido', 'dni', 'telefono', 'direccion', 'correo']
         widgets = {
             'nombre':    forms.TextInput(attrs={
-                'class':'fc', 'placeholder':'Juan Carlos Pérez Ríos'}),
+                'class':'fc', 'placeholder':'Juan Carlos'}),
+            'apellido':  forms.TextInput(attrs={
+                'class':'fc', 'placeholder':'Pérez Ríos'}),
             'dni':       forms.TextInput(attrs={
-                'class':'fc', 'placeholder':'12345678', 'maxlength':'8'}),
+                'class':'fc', 'placeholder':'12345678',
+                'maxlength':'8', 'inputmode':'numeric',
+                'pattern': '[0-9]{8}'}),
             'telefono':  forms.TextInput(attrs={
-                'class':'fc', 'placeholder':'987654321', 'maxlength':'9'}),
+                'class':'fc', 'placeholder':'987654321',
+                'maxlength':'9', 'inputmode':'numeric',
+                'pattern': '9[0-9]{8}'}),
             'direccion': forms.TextInput(attrs={
                 'class':'fc', 'placeholder':'Av. Principal 123, Lima'}),
             'correo':    forms.EmailInput(attrs={
                 'class':'fc', 'placeholder':'cliente@correo.com'}),
         }
         labels = {
-            'nombre':    'Nombre completo',
+            'nombre':    'Nombres',
+            'apellido':  'Apellidos',
             'dni':       'DNI',
             'telefono':  'Teléfono',
             'direccion': 'Dirección',
             'correo':    'Correo electrónico',
         }
 
-        # ── FORMULARIO EQUIPO ──────────────────────────────────────────
+    def clean_dni(self):
+        dni = self.cleaned_data.get('dni', '')
+        if not dni.isdigit():
+            raise forms.ValidationError('El DNI solo debe contener números.')
+        if len(dni) != 8:
+            raise forms.ValidationError('El DNI debe tener exactamente 8 dígitos.')
+        return dni
+
+    def clean_telefono(self):
+        tel = self.cleaned_data.get('telefono', '')
+        if not tel.isdigit():
+            raise forms.ValidationError('El teléfono solo debe contener números.')
+        if not tel.startswith('9'):
+            raise forms.ValidationError('El teléfono debe empezar con 9.')
+        if len(tel) != 9:
+            raise forms.ValidationError('El teléfono debe tener 9 dígitos.')
+        return tel
+
+
+# ── FORMULARIO EQUIPO ──────────────────────────────────────────
 class EquipoForm(forms.ModelForm):
+    tipo_personalizado = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'fc', 'placeholder': 'Especifica el tipo de equipo...'}),
+        label='Especifica el tipo')
+    marca_personalizada = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'fc', 'placeholder': 'Especifica la marca...'}),
+        label='Especifica la marca')
+
     class Meta:
         model  = Equipo
-        fields = ['cliente', 'tipo', 'marca', 'modelo',
-                  'serie', 'estado', 'falla']
+        fields = ['cliente', 'tipo', 'tipo_personalizado',
+                  'marca', 'marca_personalizada',
+                  'modelo', 'serie', 'estado', 'falla']
         widgets = {
             'cliente': forms.Select(attrs={'class': 'fc'}),
-            'tipo':    forms.Select(attrs={'class': 'fc'}),
-            'marca':   forms.Select(attrs={'class': 'fc'}),
+            'tipo':    forms.Select(attrs={'class': 'fc', 'id': 'id_tipo'}),
+            'marca':   forms.Select(attrs={'class': 'fc', 'id': 'id_marca'}),
             'modelo':  forms.TextInput(attrs={
                 'class': 'fc', 'placeholder': 'Ej: Pavilion 15-eh2037la'}),
             'serie':   forms.TextInput(attrs={
@@ -54,7 +92,16 @@ class EquipoForm(forms.ModelForm):
             'falla':   'Falla reportada',
         }
 
-        # ── FORMULARIO SOLICITUD ───────────────────────────────────────
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('tipo') == 'otro' and not cleaned.get('tipo_personalizado'):
+            self.add_error('tipo_personalizado', 'Debes especificar el tipo de equipo.')
+        if cleaned.get('marca') == 'otro' and not cleaned.get('marca_personalizada'):
+            self.add_error('marca_personalizada', 'Debes especificar la marca.')
+        return cleaned
+
+
+# ── FORMULARIO SOLICITUD ───────────────────────────────────────
 class SolicitudForm(forms.ModelForm):
     class Meta:
         model  = Solicitud
@@ -86,15 +133,15 @@ class SolicitudForm(forms.ModelForm):
 # ── FORMULARIO CAMBIAR ESTADO ──────────────────────────────────
 class CambiarEstadoForm(forms.Form):
     ESTADOS_ADMIN = [
-    ('pendiente',  'Pendiente'),
-    ('proceso',    'En proceso'),
-    ('finalizado', 'Finalizado'),
-    ('entregado',  'Entregado'),
+        ('pendiente',  'Pendiente'),
+        ('proceso',    'En proceso'),
+        ('finalizado', 'Finalizado'),
+        ('entregado',  'Entregado'),
     ]
     ESTADOS_TEC = [
-    ('pendiente',  'Pendiente'),
-    ('proceso',    'En proceso'),
-    ('finalizado', 'Finalizado'),
+        ('pendiente',  'Pendiente'),
+        ('proceso',    'En proceso'),
+        ('finalizado', 'Finalizado'),
     ]
     estado      = forms.ChoiceField(
         choices=ESTADOS_ADMIN,
@@ -112,66 +159,45 @@ class CambiarEstadoForm(forms.Form):
 # ── FORMULARIO ASIGNAR TÉCNICO ─────────────────────────────────
 class AsignarTecnicoForm(forms.Form):
     tecnico = forms.ModelChoiceField(
-        queryset=None,
-        widget=forms.Select(attrs={'class': 'fc'}),
-        label='Seleccionar técnico')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['tecnico'].queryset = Usuario.objects.filter(rol='tec')
+        queryset=Usuario.objects.filter(rol='tec'),
+        widget=forms.HiddenInput()
+    )
 
 
 # ── FORMULARIO USUARIO ─────────────────────────────────────────
 class UsuarioForm(forms.ModelForm):
-    password1 = forms.CharField(
-        label='Contraseña',
-        widget=forms.PasswordInput(attrs={
-            'class': 'fc', 'placeholder': 'Mínimo 8 caracteres'}))
-    password2 = forms.CharField(
-        label='Confirmar contraseña',
-        widget=forms.PasswordInput(attrs={
-            'class': 'fc', 'placeholder': 'Repite la contraseña'}))
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'fc', 'placeholder': 'Contraseña'}),
+        label='Contraseña'
+    )
+    especialidad_otro = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'fc',
+            'placeholder': 'Especifica la especialidad...',
+            'id': 'id_especialidad_otro',
+        }),
+        label='¿Cuál especialidad?'
+    )
 
     class Meta:
         model  = Usuario
-        fields = ['username', 'first_name', 'last_name',
-                  'email', 'telefono', 'dni', 'rol']
+        fields = ['username', 'first_name', 'last_name', 'email',
+                  'password', 'rol', 'especialidad', 'especialidad_otro']
         widgets = {
-            'username':   forms.TextInput(attrs={
-                'class': 'fc', 'placeholder': 'Ej: cmendoza'}),
-            'first_name': forms.TextInput(attrs={
-                'class': 'fc', 'placeholder': 'Carlos'}),
-            'last_name':  forms.TextInput(attrs={
-                'class': 'fc', 'placeholder': 'Mendoza Ríos'}),
-            'email':      forms.EmailInput(attrs={
-                'class': 'fc', 'placeholder': 'usuario@taller.com'}),
-            'telefono':   forms.TextInput(attrs={
-                'class': 'fc', 'placeholder': '987654321'}),
-            'dni':        forms.TextInput(attrs={
-                'class': 'fc', 'placeholder': '12345678'}),
+            'username':   forms.TextInput(attrs={'class': 'fc'}),
+            'first_name': forms.TextInput(attrs={'class': 'fc'}),
+            'last_name':  forms.TextInput(attrs={'class': 'fc'}),
+            'email':      forms.EmailInput(attrs={'class': 'fc'}),
             'rol':        forms.Select(attrs={'class': 'fc'}),
+            'especialidad': forms.Select(attrs={'class': 'fc', 'id': 'id_especialidad'}),
         }
-        labels = {
-            'username':   'Nombre de usuario',
-            'first_name': 'Nombre',
-            'last_name':  'Apellido',
-            'email':      'Correo electrónico',
-            'telefono':   'Teléfono',
-            'dni':        'DNI',
-            'rol':        'Rol',
-        }
-
-    def clean(self):
-        cleaned_data = super().clean()
-        p1 = cleaned_data.get('password1')
-        p2 = cleaned_data.get('password2')
-        if p1 and p2 and p1 != p2:
-            raise forms.ValidationError('Las contraseñas no coinciden.')
-        return cleaned_data
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        user.set_password(self.cleaned_data['password1'])
+        user.set_password(self.cleaned_data['password'])
+        if self.cleaned_data.get('especialidad') != 'otro':
+            user.especialidad_otro = ''
         if commit:
             user.save()
         return user
@@ -210,7 +236,8 @@ class DiagnosticoForm(forms.ModelForm):
             'recomendaciones':  'Recomendaciones',
         }
 
-        # ── FORMULARIO AVANCE ──────────────────────────────────────────
+
+# ── FORMULARIO AVANCE ──────────────────────────────────────────
 class AvanceForm(forms.ModelForm):
     class Meta:
         model  = Avance
@@ -225,3 +252,73 @@ class AvanceForm(forms.ModelForm):
             'etapa':       'Etapa de reparación',
             'descripcion': 'Descripción del avance',
         }
+
+
+# ── FORMULARIO ACTUALIZAR EQUIPO ───────────────────────────────
+class EquipoUpdateForm(forms.ModelForm):
+    tipo_personalizado = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'fc', 'placeholder': 'Especifica el tipo de equipo...'}),
+        label='Especifica el tipo')
+    marca_personalizada = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'fc', 'placeholder': 'Especifica la marca...'}),
+        label='Especifica la marca')
+
+    class Meta:
+        model  = Equipo
+        fields = ['tipo', 'tipo_personalizado', 'marca', 'marca_personalizada',
+                  'modelo', 'serie', 'estado', 'falla']
+        widgets = {
+            'tipo':   forms.Select(attrs={'class': 'fc', 'id': 'id_tipo'}),
+            'marca':  forms.Select(attrs={'class': 'fc', 'id': 'id_marca'}),
+            'modelo': forms.TextInput(attrs={
+                'class': 'fc', 'placeholder': 'Ej: Pavilion 15-eh2037la'}),
+            'serie':  forms.TextInput(attrs={
+                'class': 'fc', 'placeholder': 'SN-XXXXXXXXX'}),
+            'estado': forms.Select(attrs={'class': 'fc'}),
+            'falla':  forms.Textarea(attrs={
+                'class': 'fc', 'placeholder': 'Describe el problema reportado...'}),
+        }
+        labels = {
+            'tipo':    'Tipo de equipo',
+            'marca':   'Marca',
+            'modelo':  'Modelo',
+            'serie':   'Número de serie',
+            'estado':  'Estado físico',
+            'falla':   'Falla reportada',
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('tipo') == 'otro' and not cleaned.get('tipo_personalizado'):
+            self.add_error('tipo_personalizado', 'Debes especificar el tipo de equipo.')
+        if cleaned.get('marca') == 'otro' and not cleaned.get('marca_personalizada'):
+            self.add_error('marca_personalizada', 'Debes especificar la marca.')
+        return cleaned
+
+        # ── FORMULARIO AMPLIACIÓN DE TIEMPO ───────────────────────────
+class AmpliacionTiempoForm(forms.Form):
+    cantidad = forms.IntegerField(
+        min_value=1, max_value=999,
+        label='Tiempo adicional',
+        widget=forms.NumberInput(attrs={
+            'class': 'fc',
+            'placeholder': 'Ej: 2',
+        })
+    )
+    unidad = forms.ChoiceField(
+        choices=[('horas', 'Horas'), ('minutos', 'Minutos')],
+        label='Unidad',
+        widget=forms.Select(attrs={'class': 'fc'})
+    )
+    justificacion = forms.CharField(
+        label='Justificación',
+        widget=forms.Textarea(attrs={
+            'class': 'fc',
+            'rows': 4,
+            'placeholder': 'Explica el motivo por el que necesitas más tiempo...',
+        })
+    )

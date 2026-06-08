@@ -144,10 +144,12 @@
       {% endif %}
     </div>
 
+    {% if solicitud.estado == 'finalizado' or solicitud.estado == 'entregado' %}
     <a href="{% url 'informe_pdf' solicitud.pk %}" target="_blank"
       class="btn btn-p" style="justify-content:center;">
       <i class="bi bi-file-earmark-pdf-fill"></i> Generar Informe PDF
     </a>
+    {% endif %}
   </div>
 </div>
 

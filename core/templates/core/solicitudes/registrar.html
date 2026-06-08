@@ -14,33 +14,74 @@
   <div class="ps">Crea una nueva orden de servicio para un cliente</div>
 </div>
 
+{% if cliente_fijo and equipo_fijo %}
+<div style="margin-bottom:16px;padding:12px 16px;border-radius:var(--rs);
+  background:var(--sg);border:1px solid rgba(61,214,140,.3);
+  color:var(--success);display:flex;align-items:center;gap:10px;font-size:.85rem;">
+  <i class="bi bi-link-45deg" style="font-size:1.2rem;"></i>
+  <div>
+    <strong>Vinculado automáticamente:</strong>
+    {{ cliente_fijo.nombre_completo }} (DNI: {{ cliente_fijo.dni }})
+    — {{ equipo_fijo.get_marca_display }} {{ equipo_fijo.modelo }}
+  </div>
+</div>
+{% endif %}
+
 <div class="card" style="max-width:700px;">
   <div class="ct">Información de la solicitud</div>
   <form method="POST">
     {% csrf_token %}
+
+    {% if cliente_fijo %}
+    <input type="hidden" name="cliente" value="{{ cliente_fijo.pk }}">
+    <input type="hidden" name="cliente_id_hidden" value="{{ cliente_fijo.pk }}">
+    {% endif %}
+    {% if equipo_fijo %}
+    <input type="hidden" name="equipo" value="{{ equipo_fijo.pk }}">
+    <input type="hidden" name="equipo_id_hidden" value="{{ equipo_fijo.pk }}">
+    {% endif %}
+
     {% if form.non_field_errors %}
-<div style="background:var(--dg);border:1px solid rgba(232,68,90,.3);
-  color:var(--danger);padding:12px 16px;border-radius:var(--rs);
-  font-size:.83rem;display:flex;align-items:flex-start;gap:8px;margin-bottom:14px;">
-  <i class="bi bi-exclamation-triangle-fill" style="margin-top:2px;"></i>
-  <div>{{ form.non_field_errors|join:", " }}</div>
-</div>
-{% endif %}
+    <div style="background:var(--dg);border:1px solid rgba(232,68,90,.3);
+      color:var(--danger);padding:12px 16px;border-radius:var(--rs);
+      font-size:.83rem;display:flex;align-items:flex-start;gap:8px;margin-bottom:14px;">
+      <i class="bi bi-exclamation-triangle-fill" style="margin-top:2px;"></i>
+      <div>{{ form.non_field_errors|join:", " }}</div>
+    </div>
+    {% endif %}
+
     <div class="grid2">
+
+      <!-- Cliente -->
       <div class="fg">
         <label class="fl">Cliente <span style="color:var(--danger);">*</span></label>
-        {{ form.cliente }}
-        {% if form.cliente.errors %}
-        <span style="color:var(--danger);font-size:.72rem;">{{ form.cliente.errors|join:", " }}</span>
+        {% if cliente_fijo %}
+          <input class="fc" value="{{ cliente_fijo.nombre_completo }} (DNI: {{ cliente_fijo.dni }})"
+            disabled style="opacity:.75;cursor:not-allowed;background:var(--surface);">
+        {% else %}
+          {{ form.cliente }}
+          {% if form.cliente.errors %}
+          <span style="color:var(--danger);font-size:.72rem;">{{ form.cliente.errors|join:", " }}</span>
+          {% endif %}
         {% endif %}
       </div>
+
+      <!-- Equipo -->
       <div class="fg">
         <label class="fl">Equipo <span style="color:var(--danger);">*</span></label>
-        {{ form.equipo }}
-        {% if form.equipo.errors %}
-        <span style="color:var(--danger);font-size:.72rem;">{{ form.equipo.errors|join:", " }}</span>
+        {% if equipo_fijo %}
+          <input class="fc"
+            value="{{ equipo_fijo.get_tipo_display }} — {{ equipo_fijo.get_marca_display }} {{ equipo_fijo.modelo }} (S/N: {{ equipo_fijo.serie }})"
+            disabled style="opacity:.75;cursor:not-allowed;background:var(--surface);">
+        {% else %}
+          {{ form.equipo }}
+          {% if form.equipo.errors %}
+          <span style="color:var(--danger);font-size:.72rem;">{{ form.equipo.errors|join:", " }}</span>
+          {% endif %}
         {% endif %}
       </div>
+
+      <!-- Tipo reparación -->
       <div class="fg">
         <label class="fl">Tipo de reparación <span style="color:var(--danger);">*</span></label>
         {{ form.tipo_reparacion }}
@@ -48,6 +89,8 @@
         <span style="color:var(--danger);font-size:.72rem;">{{ form.tipo_reparacion.errors|join:", " }}</span>
         {% endif %}
       </div>
+
+      <!-- Prioridad -->
       <div class="fg">
         <label class="fl">Prioridad <span style="color:var(--danger);">*</span></label>
         {{ form.prioridad }}
@@ -55,6 +98,8 @@
         <span style="color:var(--danger);font-size:.72rem;">{{ form.prioridad.errors|join:", " }}</span>
         {% endif %}
       </div>
+
+      <!-- Descripción -->
       <div class="fg" style="grid-column:span 2;">
         <label class="fl">Descripción del problema <span style="color:var(--danger);">*</span></label>
         {{ form.descripcion }}
@@ -62,17 +107,20 @@
         <span style="color:var(--danger);font-size:.72rem;">{{ form.descripcion.errors|join:", " }}</span>
         {% endif %}
       </div>
+
+      <!-- Observaciones -->
       <div class="fg" style="grid-column:span 2;">
         <label class="fl">Observaciones del cliente</label>
         {{ form.observaciones }}
       </div>
+
     </div>
 
-    <!-- ESTIMACIÓN DE TIEMPO -->
+    <!-- Estimación de tiempo -->
     <div style="background:linear-gradient(135deg,rgba(91,141,238,.08),rgba(0,201,167,.05));
       border:1px solid rgba(91,141,238,.25);border-radius:var(--r);
       padding:16px;margin-top:16px;">
-      <div class="ct">⏱ tiempo estimado de entrega</div>
+      <div class="ct">⏱ Tiempo estimado de entrega</div>
       <div style="font-size:.82rem;color:var(--t2);">
         El sistema calculará automáticamente el tiempo estimado de entrega
         según el tipo de reparación y la prioridad seleccionada al guardar.
@@ -95,6 +143,7 @@
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 </style>
 
+{% if not cliente_fijo %}
 <script>
 const clienteSelect = document.querySelector('select[name="cliente"]');
 const equipoSelect  = document.querySelector('select[name="equipo"]');
@@ -118,13 +167,15 @@ function cargarEquipos(clienteId) {
     });
 }
 
-clienteSelect.addEventListener('change', function() {
-  cargarEquipos(this.value);
-});
-
-// Cargar equipos si ya hay un cliente seleccionado
-if (clienteSelect.value) {
-  cargarEquipos(clienteSelect.value);
+if (clienteSelect) {
+  clienteSelect.addEventListener('change', function() {
+    cargarEquipos(this.value);
+  });
+  if (clienteSelect.value) {
+    cargarEquipos(clienteSelect.value);
+  }
 }
 </script>
+{% endif %}
+
 {% endblock %}

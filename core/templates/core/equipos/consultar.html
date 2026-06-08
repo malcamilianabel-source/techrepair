@@ -86,10 +86,24 @@
             {{ equipo.falla|default:"—" }}
           </td>
           <td>                             
-    <a href="{% url 'historial_equipo' equipo.pk %}"
-       class="btn btn-o btn-sm" title="Ver historial">
-      <i class="bi bi-clock-history"></i>
-    </a>
+    <td style="display:flex;gap:6px;">
+            <a href="{% url 'actualizar_equipo' equipo.pk %}"
+              class="btn btn-o btn-sm" title="Editar equipo">
+              <i class="bi bi-pencil"></i>
+            </a>
+            <a href="{% url 'historial_equipo' equipo.pk %}"
+              class="btn btn-o btn-sm" title="Ver historial">
+              <i class="bi bi-clock-history"></i>
+            </a>
+            {% if request.user.rol == 'admin' %}
+            <a href="{% url 'eliminar_equipo' equipo.pk %}"
+              class="btn btn-sm"
+              style="background:var(--dg);color:var(--danger);border:1px solid rgba(232,68,90,.3);"
+              title="Eliminar equipo">
+              <i class="bi bi-trash-fill"></i>
+            </a>
+            {% endif %}
+          </td>
   </td>
         </tr>
         {% empty %}

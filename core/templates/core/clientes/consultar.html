@@ -76,9 +76,17 @@
               <i class="bi bi-pencil"></i>
             </a>
             <a href="{% url 'historial_cliente' cliente.pk %}"
-     class="btn btn-o btn-sm" title="Ver historial">
-    <i class="bi bi-clock-history"></i>
-  </a>
+              class="btn btn-o btn-sm" title="Ver historial">
+              <i class="bi bi-clock-history"></i>
+            </a>
+            {% if request.user.rol == 'admin' %}
+            <a href="{% url 'eliminar_cliente' cliente.pk %}"
+              class="btn btn-sm"
+              style="background:var(--dg);color:var(--danger);border:1px solid rgba(232,68,90,.3);"
+              title="Eliminar cliente">
+              <i class="bi bi-trash-fill"></i>
+            </a>
+            {% endif %}
           </td>
           
         </tr>

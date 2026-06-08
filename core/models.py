@@ -2,6 +2,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 
 
+
 # ── MODELO 1: USUARIO ──────────────────────────────────────────
 class Usuario(AbstractUser):
     ROLES = [
@@ -10,6 +11,16 @@ class Usuario(AbstractUser):
         ('tec',   'Técnico'),
     ]
     rol      = models.CharField(max_length=10, choices=ROLES, default='tec')
+    ESPECIALIDADES = [
+    ('general',     'General'),
+    ('electronica', 'Reparación Electrónica'),
+    ('hardware',    'Hardware'),
+    ('software',    'Software'),
+    ('redes',       'Redes y Conectividad'),
+    ('otro',        'Otro'),
+    ]
+    especialidad       = models.CharField(max_length=20, choices=ESPECIALIDADES, default='general')
+    especialidad_otro  = models.CharField(max_length=100, blank=True, null=True)
     telefono = models.CharField(max_length=9, blank=True)
     dni      = models.CharField(max_length=8, blank=True)
 
@@ -20,14 +31,19 @@ class Usuario(AbstractUser):
 # ── MODELO 2: CLIENTE ──────────────────────────────────────────
 class Cliente(models.Model):
     nombre    = models.CharField(max_length=100)
+    apellido  = models.CharField(max_length=100, default='', blank=True)
     dni       = models.CharField(max_length=8, unique=True)
     telefono  = models.CharField(max_length=9)
     direccion = models.CharField(max_length=200, blank=True)
     correo    = models.EmailField(blank=True)
     creado_en = models.DateTimeField(auto_now_add=True)
 
+    @property
+    def nombre_completo(self):
+        return f"{self.nombre} {self.apellido}".strip()
+
     def __str__(self):
-        return f"{self.nombre} (DNI: {self.dni})"
+        return f"{self.nombre_completo} (DNI: {self.dni})"
 
 
 # ── MODELO 3: EQUIPO ───────────────────────────────────────────
@@ -69,6 +85,8 @@ class Equipo(models.Model):
     estado     = models.CharField(max_length=10, choices=ESTADOS,
                                    default='regular')
     falla      = models.TextField(blank=True)
+    tipo_personalizado  = models.CharField(max_length=100, blank=True, default='')
+    marca_personalizada = models.CharField(max_length=100, blank=True, default='')
     creado_en  = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -111,11 +129,13 @@ class Solicitud(models.Model):
     dias_estimados        = models.IntegerField(null=True, blank=True)
     fecha_estimada        = models.DateField(null=True, blank=True)
     tiempo_estimado_texto = models.CharField(max_length=50, blank=True, default='')
+    tiempo_estimado_horas = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     fecha_entrega        = models.DateField(null=True, blank=True)
     hora_entrega         = models.TimeField(null=True, blank=True)
     observaciones_entrega= models.TextField(blank=True, default='')
     confirmacion_cliente = models.BooleanField(default=False)
     creado_en        = models.DateTimeField(auto_now_add=True)
+    
 
     def __str__(self):
         return f"#{self.id} — {self.cliente.nombre} ({self.get_estado_display()})"
@@ -234,3 +254,21 @@ class Notificacion(models.Model):
 
     def __str__(self):
         return f"Notif. #{self.solicitud.id} — {self.get_medio_display()}"
+
+        # ── MODELO 11: AMPLIACIÓN DE TIEMPO ───────────────────────────
+class AmpliacionTiempo(models.Model):
+    UNIDADES = [
+        ('horas',   'Horas'),
+        ('minutos', 'Minutos'),
+    ]
+    solicitud     = models.ForeignKey(Solicitud, on_delete=models.CASCADE,
+                                       related_name='ampliaciones')
+    tecnico       = models.ForeignKey(Usuario, on_delete=models.SET_NULL,
+                                       null=True, related_name='ampliaciones')
+    cantidad      = models.PositiveIntegerField()
+    unidad        = models.CharField(max_length=10, choices=UNIDADES)
+    justificacion = models.TextField()
+    fecha_hora    = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Ampliación #{self.solicitud.id}: +{self.cantidad} {self.unidad}'

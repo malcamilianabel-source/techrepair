@@ -25,12 +25,16 @@
     <a href="{% url 'diagnostico' solicitud.pk %}" class="btn btn-p btn-sm">
       <i class="bi bi-clipboard2-pulse-fill"></i> Diagnóstico
     </a>
+    <a href="{% url 'solicitar_ampliacion' solicitud.pk %}" class="btn btn-w btn-sm">
+      <i class="bi bi-clock-history"></i> Ampliación de tiempo
+    </a>
     <a href="{% url 'repuestos' solicitud.pk %}" class="btn btn-o btn-sm">
       <i class="bi bi-box-seam-fill"></i> Repuestos
     </a>
     <a href="{% url 'costos' solicitud.pk %}" class="btn btn-o btn-sm">
       <i class="bi bi-currency-dollar"></i> Costos
     </a>
+    
   {% endif %}
   {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
     <a href="{% url 'asignar_tecnico' solicitud.pk %}" class="btn btn-o btn-sm">
@@ -47,9 +51,11 @@
       <i class="bi bi-box-arrow-up-right"></i> Entregar Equipo
     </a>
   {% endif %}{% endif %}
+  {% if solicitud.estado == 'finalizado' or solicitud.estado == 'entregado' %}
   <a href="{% url 'informe_pdf' solicitud.pk %}" target="_blank" class="btn btn-o btn-sm">
     <i class="bi bi-file-earmark-pdf-fill"></i> PDF
   </a>
+  {% endif %}
   {% if solicitud.estado == 'entregado' and request.user.rol == 'admin' %}
   <a href="{% url 'eliminar_solicitud' solicitud.pk %}"
     class="btn btn-sm" style="background:var(--danger);color:#fff;">

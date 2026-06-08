@@ -2,39 +2,112 @@
 {% block title %}Reporte de Tiempos{% endblock %}
 {% block content %}
 <div class="bc">Inicio / <a href="{% url 'reportes' %}">Reportes</a> / <span>Tiempos</span></div>
-<div style="margin-bottom:20px;">
-  <div class="pt">
-    <div class="pt-ic" style="background:rgba(0,131,106,.15);color:#00836A;">
-      <i class="bi bi-stopwatch"></i>
+<div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+  <div>
+    <div class="pt">
+      <div class="pt-ic" style="background:rgba(0,131,106,.15);color:#00836A;">
+        <i class="bi bi-stopwatch"></i>
+      </div>
+      Reporte de Tiempos de Reparación
     </div>
-    Reporte de Tiempos de Reparación
+    <div class="ps">Análisis de tiempos estimados por tipo y prioridad</div>
   </div>
-  <div class="ps">Promedio general: {{ promedio_general }} hora(s) por solicitud</div>
+  <a href="{% url 'reportes' %}" class="btn btn-o btn-sm"><i class="bi bi-arrow-left"></i> Volver</a>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px;">
-  <div class="card" style="padding:18px;text-align:center;">
-    <div style="font-size:.75rem;color:var(--t3);text-transform:uppercase;">Promedio general</div>
-    <div style="font-size:2.2rem;font-weight:700;color:var(--accent);">{{ promedio_general }}h</div>
+<!-- MÉTRICAS -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
+  <div class="card" style="padding:16px;border-left:3px solid var(--accent);">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Promedio general</div>
+    <div style="font-size:2rem;font-weight:700;color:var(--accent);">{{ promedio_general }}h</div>
+    <div style="font-size:.72rem;color:var(--t3);">por solicitud</div>
   </div>
-  <div class="card" style="padding:18px;text-align:center;">
-    <div style="font-size:.75rem;color:var(--t3);text-transform:uppercase;">Total solicitudes</div>
-    <div style="font-size:2.2rem;font-weight:700;color:var(--accent);">{{ total_solicitudes }}</div>
+  <div class="card" style="padding:16px;border-left:3px solid #2E74B5;">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Total horas acumuladas</div>
+    <div style="font-size:2rem;font-weight:700;color:#2E74B5;">{{ total_horas_acum }}h</div>
+    <div style="font-size:.72rem;color:var(--t3);">en {{ total_solicitudes }} solicitudes</div>
+  </div>
+  <div class="card" style="padding:16px;border-left:3px solid var(--success);">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Tipo más rápido</div>
+    <div style="font-size:1.1rem;font-weight:700;color:var(--success);margin:6px 0;">{{ tipo_rapido }}</div>
+    <div style="font-size:.72rem;color:var(--t3);">menor tiempo promedio</div>
+  </div>
+  <div class="card" style="padding:16px;border-left:3px solid var(--danger);">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Tipo más largo</div>
+    <div style="font-size:1.1rem;font-weight:700;color:var(--danger);margin:6px 0;">{{ tipo_lento }}</div>
+    <div style="font-size:.72rem;color:var(--t3);">mayor tiempo promedio</div>
   </div>
 </div>
 
+<!-- GRÁFICOS -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+
+  <div class="card" style="padding:18px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;color:var(--t1);">
+        <i class="bi bi-bar-chart-fill" style="color:#00836A;"></i> Promedio por tipo (horas)
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="cambiarTipo('promChart','bar')"      class="chart-btn activo" id="btn-prom-bar">Barras</button>
+        <button onclick="cambiarTipo('promChart','pie')"      class="chart-btn" id="btn-prom-pie">Circular</button>
+        <button onclick="cambiarTipo('promChart','doughnut')" class="chart-btn" id="btn-prom-doughnut">Dona</button>
+      </div>
+    </div>
+    <canvas id="promChart" height="200"></canvas>
+  </div>
+
+  <div class="card" style="padding:18px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;color:var(--t1);">
+        <i class="bi bi-lightning-fill" style="color:#EF9F27;"></i> Promedio por prioridad (horas)
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="cambiarTipo('priorChart','bar')"      class="chart-btn activo" id="btn-prior-bar">Barras</button>
+        <button onclick="cambiarTipo('priorChart','pie')"      class="chart-btn" id="btn-prior-pie">Circular</button>
+        <button onclick="cambiarTipo('priorChart','doughnut')" class="chart-btn" id="btn-prior-doughnut">Dona</button>
+      </div>
+    </div>
+    <canvas id="priorChart" height="200"></canvas>
+  </div>
+
+  <div class="card" style="padding:18px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;color:var(--t1);">
+        <i class="bi bi-clock-history" style="color:#2E74B5;"></i> Total horas acumuladas por tipo
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="cambiarTipo('totalChart','bar')"      class="chart-btn activo" id="btn-total-bar">Barras</button>
+        <button onclick="cambiarTipo('totalChart','pie')"      class="chart-btn" id="btn-total-pie">Circular</button>
+        <button onclick="cambiarTipo('totalChart','doughnut')" class="chart-btn" id="btn-total-doughnut">Dona</button>
+      </div>
+    </div>
+    <canvas id="totalChart" height="200"></canvas>
+  </div>
+
+  <div class="card" style="padding:18px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;color:var(--t1);">
+        <i class="bi bi-list-ol" style="color:var(--success);"></i> Cantidad de solicitudes por tipo
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="cambiarTipo('cantChart','bar')"      class="chart-btn activo" id="btn-cant-bar">Barras</button>
+        <button onclick="cambiarTipo('cantChart','pie')"      class="chart-btn" id="btn-cant-pie">Circular</button>
+        <button onclick="cambiarTipo('cantChart','polarArea')"class="chart-btn" id="btn-cant-polarArea">Polar</button>
+      </div>
+    </div>
+    <canvas id="cantChart" height="200"></canvas>
+  </div>
+
+</div>
+
+<!-- TABLA -->
 <div class="card" style="padding:18px;">
   <div style="font-weight:700;color:var(--t1);margin-bottom:14px;">
-    <i class="bi bi-clock" style="color:#00836A;"></i> Tiempos por tipo de reparación
+    <i class="bi bi-table" style="color:#00836A;"></i> Detalle por tipo de reparación
   </div>
   <div class="tw"><table>
     <thead>
-      <tr>
-        <th>Tipo</th>
-        <th>Solicitudes</th>
-        <th>Total horas estimadas</th>
-        <th>Promedio por solicitud</th>
-      </tr>
+      <tr><th>Tipo</th><th>Solicitudes</th><th>Total horas estimadas</th><th>Promedio por solicitud</th><th>Eficiencia</th></tr>
     </thead>
     <tbody>
       {% for tipo, datos in tiempos_por_tipo.items %}
@@ -42,8 +115,19 @@
         <td><strong>{{ tipo }}</strong></td>
         <td>{{ datos.cantidad }}</td>
         <td>{{ datos.total_horas }}h</td>
+        <td><strong class="acc">{{ datos.promedio }}h</strong></td>
         <td>
-          <strong class="acc">{{ datos.promedio }}h</strong>
+          {% if datos.promedio > 0 %}
+            {% if datos.promedio <= 24 %}
+              <span class="badge bl">Rápido</span>
+            {% elif datos.promedio <= 72 %}
+              <span class="badge bm">Moderado</span>
+            {% else %}
+              <span class="badge bh">Largo</span>
+            {% endif %}
+          {% else %}
+            <span style="color:var(--t3);">—</span>
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
@@ -51,9 +135,59 @@
   </table></div>
 </div>
 
-<div style="margin-top:16px;">
-  <a href="{% url 'reportes' %}" class="btn btn-o">
-    <i class="bi bi-arrow-left"></i> Volver a Reportes
-  </a>
-</div>
+<style>
+.chart-btn{font-size:.72rem;padding:3px 9px;border-radius:20px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface);color:var(--t2);transition:all .15s;}
+.chart-btn:hover,.chart-btn.activo{background:var(--accent);color:#000;border-color:var(--accent);}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const COLORES = ['#5B8DEE','#00C9A7','#EF9F27','#E8445A','#A78BFA','#34D399'];
+
+const dProm  = { labels: {{ chart_labels|safe }},   data: {{ chart_promedios|safe }} };
+const dTotal = { labels: {{ chart_labels|safe }},   data: {{ chart_totales|safe }} };
+const dCant  = { labels: {{ chart_labels|safe }},   data: {{ chart_cantidad|safe }} };
+const dPrior = { labels: {{ prioridad_labels|safe }}, data: Object.values({{ tiempos_prioridad|safe }}) };
+
+const charts = {};
+function crearChart(id, tipo, datos, color) {
+  const ctx = document.getElementById(id).getContext('2d');
+  const esBarra = tipo === 'bar';
+  charts[id] = new Chart(ctx, {
+    type: tipo,
+    data: {
+      labels: datos.labels,
+      datasets: [{
+        label: 'Horas',
+        data:  datos.data,
+        backgroundColor: esBarra ? color + '99' : COLORES,
+        borderColor:     esBarra ? color        : COLORES,
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: tipo !== 'bar' } },
+      scales: esBarra ? { y: { beginAtZero: true } } : {}
+    }
+  });
+}
+function cambiarTipo(id, tipo) {
+  const prefix = id.replace('Chart','').replace('prom','prom').replace('prior','prior')
+                   .replace('total','total').replace('cant','cant');
+  document.querySelectorAll(`[id^="btn-${prefix}-"]`).forEach(b => b.classList.remove('activo'));
+  const btn = document.getElementById(`btn-${prefix}-${tipo}`);
+  if (btn) btn.classList.add('activo');
+  charts[id].destroy();
+  const colorMap = { promChart:'#00836A', priorChart:'#EF9F27', totalChart:'#2E74B5', cantChart:'#00C9A7' };
+  const datosMap = { promChart: dProm, priorChart: dPrior, totalChart: dTotal, cantChart: dCant };
+  crearChart(id, tipo, datosMap[id], colorMap[id]);
+}
+document.addEventListener('DOMContentLoaded', () => {
+  crearChart('promChart',  'bar', dProm,  '#00836A');
+  crearChart('priorChart', 'bar', dPrior, '#EF9F27');
+  crearChart('totalChart', 'bar', dTotal, '#2E74B5');
+  crearChart('cantChart',  'bar', dCant,  '#00C9A7');
+});
+</script>
 {% endblock %}

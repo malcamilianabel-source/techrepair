@@ -2,31 +2,109 @@
 {% block title %}Reporte de Ingresos{% endblock %}
 {% block content %}
 <div class="bc">Inicio / <a href="{% url 'reportes' %}">Reportes</a> / <span>Ingresos</span></div>
-<div style="margin-bottom:20px;">
-  <div class="pt">
-    <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
-      <i class="bi bi-cash-stack"></i>
+<div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+  <div>
+    <div class="pt">
+      <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
+        <i class="bi bi-cash-stack"></i>
+      </div>
+      Reporte de Ingresos
     </div>
-    Reporte de Ingresos
+    <div class="ps">{{ total_registros }} servicio(s) con costo registrado</div>
   </div>
-  <div class="ps">{{ total_registros }} servicio(s) con costo registrado</div>
+  <a href="{% url 'reportes' %}" class="btn btn-o btn-sm"><i class="bi bi-arrow-left"></i> Volver</a>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:20px;">
-  <div class="card" style="padding:18px;text-align:center;">
-    <div style="font-size:.75rem;color:var(--t3);text-transform:uppercase;">Total ingresos</div>
-    <div style="font-size:2rem;font-weight:700;color:var(--accent);">S/. {{ total_ingresos|floatformat:2 }}</div>
+<!-- MÉTRICAS -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
+  <div class="card" style="padding:16px;border-left:3px solid var(--accent);">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Total ingresos</div>
+    <div style="font-size:1.8rem;font-weight:700;color:var(--accent);">S/. {{ total_ingresos|floatformat:2 }}</div>
+    <div style="font-size:.72rem;color:var(--t3);">acumulado total</div>
   </div>
-  <div class="card" style="padding:18px;text-align:center;">
-    <div style="font-size:.75rem;color:var(--t3);text-transform:uppercase;">Mano de obra</div>
-    <div style="font-size:2rem;font-weight:700;color:#2E74B5;">S/. {{ total_mano_obra|floatformat:2 }}</div>
+  <div class="card" style="padding:16px;border-left:3px solid #2E74B5;">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Mano de obra</div>
+    <div style="font-size:1.8rem;font-weight:700;color:#2E74B5;">S/. {{ total_mano_obra|floatformat:2 }}</div>
+    <div style="font-size:.72rem;color:var(--t3);">por servicios técnicos</div>
   </div>
-  <div class="card" style="padding:18px;text-align:center;">
-    <div style="font-size:.75rem;color:var(--t3);text-transform:uppercase;">Repuestos</div>
-    <div style="font-size:2rem;font-weight:700;color:#00836A;">S/. {{ total_repuestos|floatformat:2 }}</div>
+  <div class="card" style="padding:16px;border-left:3px solid #00836A;">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Repuestos</div>
+    <div style="font-size:1.8rem;font-weight:700;color:#00836A;">S/. {{ total_repuestos|floatformat:2 }}</div>
+    <div style="font-size:.72rem;color:var(--t3);">materiales utilizados</div>
+  </div>
+  <div class="card" style="padding:16px;border-left:3px solid var(--warn);">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Ticket promedio</div>
+    <div style="font-size:1.8rem;font-weight:700;color:var(--warn);">S/. {{ ticket_promedio }}</div>
+    <div style="font-size:.72rem;color:var(--t3);">por servicio</div>
   </div>
 </div>
 
+<!-- GRÁFICOS -->
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+
+  <!-- Ingresos por mes -->
+  <div class="card" style="padding:18px;grid-column:span 2;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;color:var(--t1);">
+        <i class="bi bi-graph-up-arrow" style="color:var(--accent);"></i> Ingresos últimos 6 meses (S/.)
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="cambiarTipo('mesesChart','bar')"  class="chart-btn activo" id="btn-meses-bar">Barras</button>
+        <button onclick="cambiarTipo('mesesChart','line')" class="chart-btn" id="btn-meses-line">Línea</button>
+      </div>
+    </div>
+    <canvas id="mesesChart" height="100"></canvas>
+  </div>
+
+  <!-- Distribución mano obra vs repuestos -->
+  <div class="card" style="padding:18px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;color:var(--t1);">
+        <i class="bi bi-pie-chart-fill" style="color:#2E74B5;"></i> Distribución de ingresos
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="cambiarTipo('distChart','pie')"      class="chart-btn activo" id="btn-dist-pie">Circular</button>
+        <button onclick="cambiarTipo('distChart','doughnut')" class="chart-btn" id="btn-dist-doughnut">Dona</button>
+        <button onclick="cambiarTipo('distChart','bar')"      class="chart-btn" id="btn-dist-bar">Barras</button>
+      </div>
+    </div>
+    <canvas id="distChart" height="200"></canvas>
+  </div>
+
+  <!-- Ingresos por tipo de reparación -->
+  <div class="card" style="padding:18px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;color:var(--t1);">
+        <i class="bi bi-tools" style="color:#00836A;"></i> Ingresos por tipo de reparación
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="cambiarTipo('tipoIngChart','bar')"      class="chart-btn activo" id="btn-tipoing-bar">Barras</button>
+        <button onclick="cambiarTipo('tipoIngChart','pie')"      class="chart-btn" id="btn-tipoing-pie">Circular</button>
+        <button onclick="cambiarTipo('tipoIngChart','doughnut')" class="chart-btn" id="btn-tipoing-doughnut">Dona</button>
+      </div>
+    </div>
+    <canvas id="tipoIngChart" height="200"></canvas>
+  </div>
+
+  <!-- Ingresos por técnico -->
+  {% if tec_ingresos %}
+  <div class="card" style="padding:18px;grid-column:span 2;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;color:var(--t1);">
+        <i class="bi bi-person-badge" style="color:var(--warn);"></i> Ingresos generados por técnico (S/.)
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="cambiarTipo('tecIngChart','bar')"  class="chart-btn activo" id="btn-tecIng-bar">Barras</button>
+        <button onclick="cambiarTipo('tecIngChart','pie')"  class="chart-btn" id="btn-tecIng-pie">Circular</button>
+      </div>
+    </div>
+    <canvas id="tecIngChart" height="80"></canvas>
+  </div>
+  {% endif %}
+
+</div>
+
+<!-- TABLA -->
 <div class="card" style="padding:18px;">
   <div style="font-weight:700;color:var(--t1);margin-bottom:14px;">
     <i class="bi bi-receipt" style="color:var(--accent);"></i> Últimos 10 servicios cobrados
@@ -38,9 +116,9 @@
     <tbody>
       {% for c in ultimos %}
       <tr>
-        <td><strong class="mono acc">#S-{{ c.solicitud.id }}</strong></td>
-        <td>{{ c.solicitud.cliente.nombre }}</td>
-        <td>{{ c.solicitud.equipo.marca }} {{ c.solicitud.equipo.modelo }}</td>
+        <td><a href="{% url 'detalle_solicitud' c.solicitud.pk %}" class="mono acc">#S-{{ c.solicitud.id }}</a></td>
+        <td>{{ c.solicitud.cliente.nombre_completo }}</td>
+        <td>{{ c.solicitud.equipo.get_marca_display }} {{ c.solicitud.equipo.modelo }}</td>
         <td class="mono">S/. {{ c.mano_obra|floatformat:2 }}</td>
         <td><strong class="mono acc">S/. {{ c.total|floatformat:2 }}</strong></td>
       </tr>
@@ -51,9 +129,104 @@
   </table></div>
 </div>
 
-<div style="margin-top:16px;">
-  <a href="{% url 'reportes' %}" class="btn btn-o">
-    <i class="bi bi-arrow-left"></i> Volver a Reportes
-  </a>
-</div>
+<style>
+.chart-btn{font-size:.72rem;padding:3px 9px;border-radius:20px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface);color:var(--t2);transition:all .15s;}
+.chart-btn:hover,.chart-btn.activo{background:var(--accent);color:#000;border-color:var(--accent);}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const COLORES = ['#5B8DEE','#00C9A7','#EF9F27','#E8445A','#A78BFA','#34D399'];
+
+const dMeses = {
+  labels: {{ meses_labels|safe }},
+  ingresos: {{ meses_ingresos|safe }},
+  mano: {{ meses_mano|safe }},
+};
+const dDist = {
+  labels: ['Mano de obra','Repuestos'],
+  data:   [{{ total_mano_obra|floatformat:2 }}, {{ total_repuestos|floatformat:2 }}]
+};
+const dTipoIng = {
+  labels: {{ ingresos_tipo_labels|safe }},
+  data:   {{ ingresos_tipo_data|safe }}
+};
+const dTecIng = {
+  labels: {{ tec_labels|safe }},
+  data:   {{ tec_data|safe }}
+};
+
+const charts = {};
+
+function crearMesesChart(tipo) {
+  const ctx = document.getElementById('mesesChart').getContext('2d');
+  const esBarra = tipo === 'bar';
+  charts['mesesChart'] = new Chart(ctx, {
+    type: tipo,
+    data: {
+      labels: dMeses.labels,
+      datasets: [
+        { label: 'Total ingresos', data: dMeses.ingresos,
+          backgroundColor: esBarra ? '#5B8DEE99' : '#5B8DEE',
+          borderColor: '#5B8DEE', borderWidth: 2, tension: 0.4, fill: false },
+        { label: 'Mano de obra', data: dMeses.mano,
+          backgroundColor: esBarra ? '#00C9A799' : '#00C9A7',
+          borderColor: '#00C9A7', borderWidth: 2, tension: 0.4, fill: false },
+      ]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: true } },
+      scales: { y: { beginAtZero: true } }
+    }
+  });
+}
+
+function crearChart(id, tipo, datos, color) {
+  const ctx = document.getElementById(id).getContext('2d');
+  const esBarra = tipo === 'bar';
+  charts[id] = new Chart(ctx, {
+    type: tipo,
+    data: {
+      labels: datos.labels,
+      datasets: [{
+        label: 'S/.',
+        data: datos.data,
+        backgroundColor: esBarra ? color + '99' : COLORES,
+        borderColor:     esBarra ? color        : COLORES,
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: tipo !== 'bar' } },
+      scales: esBarra ? { y: { beginAtZero: true } } : {}
+    }
+  });
+}
+
+function cambiarTipo(id, tipo) {
+  const prefijos = {
+    mesesChart: 'meses', distChart: 'dist',
+    tipoIngChart: 'tipoing', tecIngChart: 'tecIng'
+  };
+  const prefix = prefijos[id] || id.replace('Chart','');
+  document.querySelectorAll(`[id^="btn-${prefix}-"]`).forEach(b => b.classList.remove('activo'));
+  const btn = document.getElementById(`btn-${prefix}-${tipo}`);
+  if (btn) btn.classList.add('activo');
+  charts[id].destroy();
+  if (id === 'mesesChart') { crearMesesChart(tipo); return; }
+  const colorMap = { distChart:'#2E74B5', tipoIngChart:'#00836A', tecIngChart:'#EF9F27' };
+  const datosMap = { distChart: dDist, tipoIngChart: dTipoIng, tecIngChart: dTecIng };
+  crearChart(id, tipo, datosMap[id], colorMap[id]);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  crearMesesChart('bar');
+  crearChart('distChart',   'pie', dDist,   '#2E74B5');
+  crearChart('tipoIngChart','bar', dTipoIng,'#00836A');
+  crearChart('tecIngChart', 'bar', dTecIng, '#EF9F27');
+  document.getElementById('btn-dist-pie').classList.add('activo');
+});
+</script>
 {% endblock %}

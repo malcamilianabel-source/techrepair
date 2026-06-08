@@ -1,34 +1,29 @@
 {% extends 'core/base.html' %}
-{% block title %}Registrar Equipo{% endblock %}
+{% block title %}Actualizar Equipo{% endblock %}
 {% block content %}
-<div class="bc">Inicio / Equipos / <span>Registrar Equipo</span></div>
+<div class="bc">Inicio / Equipos / <span>Actualizar Equipo</span></div>
 <div style="margin-bottom:20px;">
   <div class="pt">
-    <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
-      <i class="bi bi-laptop-fill"></i>
+    <div class="pt-ic" style="background:var(--wg);color:var(--warn);">
+      <i class="bi bi-pencil-square"></i>
     </div>
-    Registrar Nuevo Equipo
+    Actualizar Datos del Equipo
   </div>
-  <div class="ps">Ingresa las características del equipo y asócialo a un cliente</div>
+  <div class="ps">Modifica la información del equipo registrado</div>
 </div>
-
-{% if cliente_fijo %}
-<div style="margin-bottom:16px;padding:12px 16px;border-radius:var(--rs);
-  background:var(--sg);border:1px solid rgba(61,214,140,.3);
-  color:var(--success);display:flex;align-items:center;gap:10px;font-size:.85rem;">
-  <i class="bi bi-person-check-fill" style="font-size:1.1rem;"></i>
-  <div><strong>Cliente vinculado:</strong> {{ cliente_fijo.nombre_completo }} — DNI: {{ cliente_fijo.dni }}</div>
-</div>
-{% endif %}
 
 <div class="card" style="max-width:700px;">
+  <div style="margin-bottom:16px;padding:10px 14px;border-radius:var(--rs);
+    background:var(--ag);border:1px solid rgba(91,141,238,.3);
+    color:var(--accent);font-size:.82rem;display:flex;align-items:center;gap:8px;">
+    <i class="bi bi-laptop-fill"></i>
+    Editando: <strong>{{ equipo.get_marca_display }} {{ equipo.modelo }}</strong>
+    — Propietario: <strong>{{ equipo.cliente.nombre_completo }}</strong>
+  </div>
+
   <div class="ct">Especificaciones del equipo</div>
   <form method="POST">
     {% csrf_token %}
-    {% if cliente_fijo %}
-    <input type="hidden" name="cliente" value="{{ cliente_fijo.pk }}">
-    <input type="hidden" name="cliente_id_hidden" value="{{ cliente_fijo.pk }}">
-    {% endif %}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
 
       <!-- Tipo -->
@@ -37,7 +32,6 @@
         {{ form.tipo }}
         {% if form.tipo.errors %}<span style="color:var(--danger);font-size:.72rem;">{{ form.tipo.errors|join:", " }}</span>{% endif %}
       </div>
-      <!-- Tipo personalizado (oculto por defecto) -->
       <div class="fg" id="wrap_tipo_otro" style="display:none;">
         <label class="fl">Especifica el tipo <span style="color:var(--danger);">*</span></label>
         {{ form.tipo_personalizado }}
@@ -50,7 +44,6 @@
         {{ form.marca }}
         {% if form.marca.errors %}<span style="color:var(--danger);font-size:.72rem;">{{ form.marca.errors|join:", " }}</span>{% endif %}
       </div>
-      <!-- Marca personalizada (oculto por defecto) -->
       <div class="fg" id="wrap_marca_otra" style="display:none;">
         <label class="fl">Especifica la marca <span style="color:var(--danger);">*</span></label>
         {{ form.marca_personalizada }}
@@ -79,16 +72,11 @@
         {% if form.estado.errors %}<span style="color:var(--danger);font-size:.72rem;">{{ form.estado.errors|join:", " }}</span>{% endif %}
       </div>
 
-      <!-- Cliente propietario -->
+      <!-- Propietario — no editable -->
       <div class="fg">
-        <label class="fl">Cliente propietario <span style="color:var(--danger);">*</span></label>
-        {% if cliente_fijo %}
-          <input class="fc" value="{{ cliente_fijo.nombre_completo }} (DNI: {{ cliente_fijo.dni }})"
-            disabled style="opacity:.75;cursor:not-allowed;background:var(--surface);">
-        {% else %}
-          {{ form.cliente }}
-          {% if form.cliente.errors %}<span style="color:var(--danger);font-size:.72rem;">{{ form.cliente.errors|join:", " }}</span>{% endif %}
-        {% endif %}
+        <label class="fl">Cliente propietario <small style="color:var(--t3);">(no editable)</small></label>
+        <input class="fc" value="{{ equipo.cliente.nombre_completo }} (DNI: {{ equipo.cliente.dni }})"
+          disabled style="opacity:.4;cursor:not-allowed;">
       </div>
 
       <!-- Falla -->
@@ -102,10 +90,10 @@
     <div style="display:flex;gap:8px;margin-top:18px;
       padding-top:16px;border-top:1px solid var(--border);">
       <button class="btn btn-p" type="submit">
-        <i class="bi bi-hdd-fill"></i> Registrar Equipo
+        <i class="bi bi-check-circle-fill"></i> Guardar Cambios
       </button>
       <a href="{% url 'consultar_equipos' %}" class="btn btn-o">
-        <i class="bi bi-x"></i> Cancelar
+        <i class="bi bi-arrow-left"></i> Volver
       </a>
     </div>
   </form>
@@ -127,12 +115,11 @@ document.addEventListener('DOMContentLoaded', function(){
 
   tipoSel.addEventListener('change', toggleTipo);
   marcaSel.addEventListener('change', toggleMarca);
-
- 
   toggleTipo();
   toggleMarca();
 });
 </script>
+
 <script>
 const marcasPorTipo = {
   'laptop':    ['hp','dell','lenovo','asus','acer','apple','samsung','toshiba','sony','otro'],

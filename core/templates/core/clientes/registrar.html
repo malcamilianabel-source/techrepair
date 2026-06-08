@@ -1,7 +1,5 @@
 {% extends 'core/base.html' %}
-
 {% block title %}Registrar Cliente{% endblock %}
-
 {% block content %}
 <div class="bc">Inicio / Clientes / <span>Registrar Cliente</span></div>
 <div style="margin-bottom:20px;">
@@ -16,27 +14,63 @@
 
 <div class="card" style="max-width:620px;">
   <div class="ct">Datos del cliente</div>
-  <form method="POST">
+  <form method="POST" novalidate>
     {% csrf_token %}
     <div class="grid2">
-      {% for field in form %}
-      <div class="fg {% if forloop.last %}span2{% endif %}">
-        <label class="fl">
-          {{ field.label }}
-          {% if field.field.required %}
-            <span style="color:var(--danger);">*</span>
-          {% endif %}
-        </label>
-        {{ field }}
-        {% if field.errors %}
-        <span style="color:var(--danger);font-size:.72rem;">
-          {{ field.errors|join:", " }}
-        </span>
+
+      <div class="fg">
+        <label class="fl">Nombres <span style="color:var(--danger);">*</span></label>
+        {{ form.nombre }}
+        {% if form.nombre.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.nombre.errors|join:", " }}</span>
         {% endif %}
       </div>
-      {% endfor %}
+
+      <div class="fg">
+        <label class="fl">Apellidos <span style="color:var(--danger);">*</span></label>
+        {{ form.apellido }}
+        {% if form.apellido.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.apellido.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+
+      <div class="fg">
+        <label class="fl">DNI <span style="color:var(--danger);">*</span></label>
+        {{ form.dni }}
+        <span style="font-size:.7rem;color:var(--t3);">Solo números · exactamente 8 dígitos</span>
+        {% if form.dni.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.dni.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+
+      <div class="fg">
+        <label class="fl">Teléfono <span style="color:var(--danger);">*</span></label>
+        {{ form.telefono }}
+        <span style="font-size:.7rem;color:var(--t3);">Solo números · debe empezar con 9</span>
+        {% if form.telefono.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.telefono.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+
+      <div class="fg">
+        <label class="fl">Dirección</label>
+        {{ form.direccion }}
+        {% if form.direccion.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.direccion.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+
+      <div class="fg">
+        <label class="fl">Correo electrónico</label>
+        {{ form.correo }}
+        {% if form.correo.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.correo.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+
     </div>
-    <div style="display:flex;gap:8px;margin-top:18px;
+
+    <div style="display:flex;gap:8px;margin-top:16px;
       padding-top:16px;border-top:1px solid var(--border);">
       <button class="btn btn-p" type="submit">
         <i class="bi bi-person-check-fill"></i> Guardar Cliente
@@ -50,6 +84,17 @@
 
 <style>
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-.span2{grid-column:span 2;}
 </style>
+<script>
+document.addEventListener('DOMContentLoaded', function(){
+  const soloNumeros = function(e){
+    const permitidos = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab'];
+    if(!permitidos.includes(e.key) && !/^\d$/.test(e.key)) e.preventDefault();
+  };
+  const dni = document.getElementById('id_dni');
+  const tel = document.getElementById('id_telefono');
+  if(dni) dni.addEventListener('keydown', soloNumeros);
+  if(tel) tel.addEventListener('keydown', soloNumeros);
+});
+</script>
 {% endblock %}

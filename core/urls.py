@@ -13,12 +13,16 @@ urlpatterns = [
     path('clientes/', views.consultar_clientes, name='consultar_clientes'),
     path('clientes/registrar/', views.registrar_cliente, name='registrar_cliente'),
     path('clientes/actualizar/<int:pk>/', views.actualizar_cliente, name='actualizar_cliente'),
+    path('clientes/<int:pk>/eliminar/', views.eliminar_cliente, name='eliminar_cliente'),
     path('clientes/<int:pk>/historial/', views.historial_cliente, name='historial_cliente'),
+    
 
     # ── EQUIPOS ──
     path('equipos/', views.consultar_equipos, name='consultar_equipos'),
     path('equipos/registrar/', views.registrar_equipo, name='registrar_equipo'),
+    path('equipos/<int:pk>/actualizar/', views.actualizar_equipo, name='actualizar_equipo'),
     path('equipos/<int:pk>/historial/', views.historial_equipo, name='historial_equipo'),
+    path('equipos/<int:pk>/eliminar/',   views.eliminar_equipo,  name='eliminar_equipo'),
 
     # ── SOLICITUDES ──
     path('solicitudes/', views.consultar_solicitudes, name='consultar_solicitudes'),
@@ -35,6 +39,7 @@ urlpatterns = [
     path('solicitudes/<int:pk>/eliminar/', views.eliminar_solicitud, name='eliminar_solicitud'),
     path('solicitudes/<int:pk>/prioritaria/', views.marcar_prioritaria, name='marcar_prioritaria'),
     path('solicitudes/<int:pk>/reasignar/', views.reasignar_tecnico, name='reasignar_tecnico'),
+    path('solicitudes/<int:pk>/ampliacion/', views.solicitar_ampliacion, name='solicitar_ampliacion'),
 
     # ── USUARIOS ──
     path('usuarios/registrar/', views.registrar_usuario, name='registrar_usuario'),

@@ -1,120 +1,96 @@
 {% extends 'core/base.html' %}
-
 {% block title %}Registrar Usuario{% endblock %}
-
 {% block content %}
-<div class="bc">Inicio / Usuarios / <span>Registrar Usuario</span></div>
+<div class="bc">Inicio / <span>Registrar Usuario</span></div>
 <div style="margin-bottom:20px;">
   <div class="pt">
-    <div class="pt-ic" style="background:var(--sg);color:var(--success);">
+    <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
       <i class="bi bi-person-plus-fill"></i>
     </div>
     Registrar Nuevo Usuario
   </div>
-  <div class="ps">Solo el Administrador puede crear cuentas de acceso</div>
+  <div class="ps">Crea una cuenta para un técnico, recepcionista o administrador</div>
 </div>
 
-{% if messages %}
-{% for msg in messages %}
-<div style="background:var(--sg);border:1px solid rgba(61,214,140,.3);color:var(--success);
-  padding:10px 14px;border-radius:var(--rs);font-size:.82rem;
-  display:flex;align-items:center;gap:8px;margin-bottom:14px;">
-  <i class="bi bi-check-circle-fill"></i> {{ msg }}
-</div>
-{% endfor %}
-{% endif %}
-
-<div class="card" style="max-width:640px;">
-  <div class="ct">Datos de la cuenta</div>
+<div class="card" style="max-width:560px;padding:24px;">
   <form method="POST">
     {% csrf_token %}
-    <div class="grid2">
-      <div class="fg">
-        <label class="fl">Nombre <span style="color:var(--danger);">*</span></label>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
+      <div>
+        <label class="fl">Nombre</label>
         {{ form.first_name }}
-        {% if form.first_name.errors %}
-        <span style="color:var(--danger);font-size:.72rem;">{{ form.first_name.errors|join:", " }}</span>
-        {% endif %}
       </div>
-      <div class="fg">
-        <label class="fl">Apellido <span style="color:var(--danger);">*</span></label>
+      <div>
+        <label class="fl">Apellido</label>
         {{ form.last_name }}
-        {% if form.last_name.errors %}
-        <span style="color:var(--danger);font-size:.72rem;">{{ form.last_name.errors|join:", " }}</span>
-        {% endif %}
-      </div>
-      <div class="fg">
-        <label class="fl">DNI</label>
-        {{ form.dni }}
-        {% if form.dni.errors %}
-        <span style="color:var(--danger);font-size:.72rem;">{{ form.dni.errors|join:", " }}</span>
-        {% endif %}
-      </div>
-      <div class="fg">
-        <label class="fl">Teléfono</label>
-        {{ form.telefono }}
-        {% if form.telefono.errors %}
-        <span style="color:var(--danger);font-size:.72rem;">{{ form.telefono.errors|join:", " }}</span>
-        {% endif %}
-      </div>
-      <div class="fg">
-        <label class="fl">Correo electrónico</label>
-        {{ form.email }}
-        {% if form.email.errors %}
-        <span style="color:var(--danger);font-size:.72rem;">{{ form.email.errors|join:", " }}</span>
-        {% endif %}
-      </div>
-      <div class="fg">
-        <label class="fl">Nombre de usuario <span style="color:var(--danger);">*</span></label>
-        {{ form.username }}
-        {% if form.username.errors %}
-        <span style="color:var(--danger);font-size:.72rem;">{{ form.username.errors|join:", " }}</span>
-        {% endif %}
-      </div>
-      <div class="fg">
-        <label class="fl">Contraseña <span style="color:var(--danger);">*</span></label>
-        {{ form.password1 }}
-        {% if form.password1.errors %}
-        <span style="color:var(--danger);font-size:.72rem;">{{ form.password1.errors|join:", " }}</span>
-        {% endif %}
-      </div>
-      <div class="fg">
-        <label class="fl">Confirmar contraseña <span style="color:var(--danger);">*</span></label>
-        {{ form.password2 }}
-        {% if form.password2.errors %}
-        <span style="color:var(--danger);font-size:.72rem;">{{ form.password2.errors|join:", " }}</span>
-        {% endif %}
-      </div>
-      <div class="fg" style="grid-column:span 2;">
-        <label class="fl">Rol <span style="color:var(--danger);">*</span></label>
-        {{ form.rol }}
-        {% if form.rol.errors %}
-        <span style="color:var(--danger);font-size:.72rem;">{{ form.rol.errors|join:", " }}</span>
-        {% endif %}
-        <span style="font-size:.7rem;color:var(--t3);">El rol define qué módulos puede ver y usar el usuario</span>
       </div>
     </div>
 
-    {% if form.non_field_errors %}
-    <div style="background:var(--dg);border:1px solid rgba(232,68,90,.3);color:var(--danger);
-      padding:10px 14px;border-radius:var(--rs);font-size:.82rem;margin-top:12px;">
-      {{ form.non_field_errors|join:", " }}
+    <div style="margin-bottom:12px;">
+      <label class="fl">Usuario</label>
+      {{ form.username }}
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label class="fl">Correo electrónico</label>
+      {{ form.email }}
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label class="fl">Contraseña</label>
+      {{ form.password }}
+    </div>
+
+    <div style="margin-bottom:12px;">
+      <label class="fl">Rol</label>
+      {{ form.rol }}
+    </div>
+
+    <div id="bloque-especialidad" style="margin-bottom:12px;display:none;">
+      <label class="fl">Especialidad</label>
+      {{ form.especialidad }}
+    </div>
+
+    <div id="bloque-otro" style="margin-bottom:16px;display:none;">
+      <label class="fl">¿Cuál especialidad?</label>
+      {{ form.especialidad_otro }}
+    </div>
+
+    {% if form.errors %}
+    <div style="background:rgba(232,68,90,.1);border:1px solid rgba(232,68,90,.3);
+      color:var(--danger);padding:10px 14px;border-radius:var(--rs);
+      font-size:.82rem;margin-bottom:14px;">
+      {% for field in form %}{% for e in field.errors %}<div>{{ e }}</div>{% endfor %}{% endfor %}
     </div>
     {% endif %}
 
-    <div style="display:flex;gap:8px;margin-top:18px;
-      padding-top:16px;border-top:1px solid var(--border);">
-      <button class="btn btn-p" type="submit">
-        <i class="bi bi-check-circle-fill"></i> Registrar Usuario
+    <div style="display:flex;gap:10px;">
+      <button type="submit" class="btn btn-p">
+        <i class="bi bi-person-check"></i> Registrar
       </button>
-      <a href="{% url 'dashboard' %}" class="btn btn-o">
-        <i class="bi bi-x"></i> Cancelar
-      </a>
+      <a href="{% url 'dashboard' %}" class="btn btn-o">Cancelar</a>
     </div>
   </form>
 </div>
 
-<style>
-.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
-</style>
+<script>
+const rolSelect  = document.getElementById('id_rol');
+const espSelect  = document.getElementById('id_especialidad');
+const bloqueEsp  = document.getElementById('bloque-especialidad');
+const bloqueOtro = document.getElementById('bloque-otro');
+
+function toggleEspecialidad() {
+  const esRol = rolSelect.value === 'tec';
+  bloqueEsp.style.display  = esRol ? 'block' : 'none';
+  bloqueOtro.style.display = (esRol && espSelect.value === 'otro') ? 'block' : 'none';
+}
+
+rolSelect.addEventListener('change', toggleEspecialidad);
+espSelect.addEventListener('change', () => {
+  bloqueOtro.style.display = espSelect.value === 'otro' ? 'block' : 'none';
+});
+
+toggleEspecialidad();
+</script>
 {% endblock %}

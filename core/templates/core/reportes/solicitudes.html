@@ -2,68 +2,123 @@
 {% block title %}Reporte de Solicitudes{% endblock %}
 {% block content %}
 <div class="bc">Inicio / <a href="{% url 'reportes' %}">Reportes</a> / <span>Solicitudes</span></div>
-<div style="margin-bottom:20px;">
-  <div class="pt">
-    <div class="pt-ic" style="background:rgba(46,116,181,.15);color:#2E74B5;">
-      <i class="bi bi-clipboard-data"></i>
+<div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+  <div>
+    <div class="pt">
+      <div class="pt-ic" style="background:rgba(46,116,181,.15);color:#2E74B5;">
+        <i class="bi bi-clipboard-data"></i>
+      </div>
+      Reporte de Solicitudes
     </div>
-    Reporte de Solicitudes
+    <div class="ps">Total registrado: <strong>{{ total }}</strong> solicitud(es)</div>
   </div>
-  <div class="ps">Total registrado: {{ total }} solicitud(es)</div>
+  <a href="{% url 'reportes' %}" class="btn btn-o btn-sm">
+    <i class="bi bi-arrow-left"></i> Volver
+  </a>
 </div>
 
-<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin-bottom:20px;">
-  {% for label, cant in estados.items %}
-  <div class="card" style="padding:18px;">
-    <div style="font-size:.75rem;color:var(--t3);text-transform:uppercase;letter-spacing:.05em;">
-      {{ label }}
-    </div>
-    <div style="font-size:2rem;font-weight:700;color:var(--accent);margin:6px 0;">{{ cant }}</div>
-    <div style="font-size:.78rem;color:var(--t3);">
-      {% if total %}{{ cant|floatformat:0 }} de {{ total }}{% endif %}
-    </div>
+<!-- MÉTRICAS RÁPIDAS -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">
+  <div class="card" style="padding:16px;border-left:3px solid var(--warn);">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Pendientes</div>
+    <div style="font-size:2rem;font-weight:700;color:var(--warn);">{{ estados.pendiente }}</div>
+    <div style="font-size:.72rem;color:var(--t3);">En espera de atención</div>
   </div>
-  {% endfor %}
+  <div class="card" style="padding:16px;border-left:3px solid #2E74B5;">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">En proceso</div>
+    <div style="font-size:2rem;font-weight:700;color:#2E74B5;">{{ estados.proceso }}</div>
+    <div style="font-size:.72rem;color:var(--t3);">Actualmente en reparación</div>
+  </div>
+  <div class="card" style="padding:16px;border-left:3px solid var(--success);">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Finalizadas</div>
+    <div style="font-size:2rem;font-weight:700;color:var(--success);">{{ estados.finalizado }}</div>
+    <div style="font-size:.72rem;color:var(--t3);">Reparación completada</div>
+  </div>
+  <div class="card" style="padding:16px;border-left:3px solid var(--teal);">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Entregadas</div>
+    <div style="font-size:2rem;font-weight:700;color:var(--teal);">{{ estados.entregado }}</div>
+    <div style="font-size:.72rem;color:var(--t3);">Devueltas al cliente</div>
+  </div>
+  <div class="card" style="padding:16px;border-left:3px solid var(--accent);">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Tasa resolución</div>
+    <div style="font-size:2rem;font-weight:700;color:var(--accent);">{{ tasa }}%</div>
+    <div style="font-size:.72rem;color:var(--t3);">{{ resueltas }} de {{ total }} resueltas</div>
+  </div>
+  {% if marca_top %}
+  <div class="card" style="padding:16px;border-left:3px solid var(--danger);">
+    <div style="font-size:.7rem;color:var(--t3);text-transform:uppercase;letter-spacing:.06em;">Marca más reparada</div>
+    <div style="font-size:1.4rem;font-weight:700;color:var(--danger);text-transform:uppercase;">{{ marca_top.marca }}</div>
+    <div style="font-size:.72rem;color:var(--t3);">{{ marca_top.total }} solicitude(s)</div>
+  </div>
+  {% endif %}
 </div>
 
+<!-- GRÁFICOS -->
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px;">
+
+  <!-- Gráfico estados -->
   <div class="card" style="padding:18px;">
-    <div style="font-weight:700;color:var(--t1);margin-bottom:14px;">
-      <i class="bi bi-tools" style="color:#2E74B5;"></i> Por tipo de reparación
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;color:var(--t1);">
+        <i class="bi bi-pie-chart-fill" style="color:#2E74B5;"></i> Estados
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="cambiarTipo('estadosChart','pie')"      class="chart-btn" id="btn-estados-pie">Circular</button>
+        <button onclick="cambiarTipo('estadosChart','bar')"      class="chart-btn" id="btn-estados-bar">Barras</button>
+        <button onclick="cambiarTipo('estadosChart','doughnut')" class="chart-btn" id="btn-estados-doughnut">Dona</button>
+      </div>
     </div>
-    <div class="tw"><table>
-      <thead><tr><th>Tipo</th><th>Cantidad</th></tr></thead>
-      <tbody>
-        {% for label, cant in tipos.items %}
-        <tr>
-          <td>{{ label }}</td>
-          <td><strong class="acc">{{ cant }}</strong></td>
-        </tr>
-        {% endfor %}
-      </tbody>
-    </table></div>
+    <canvas id="estadosChart" height="200"></canvas>
   </div>
 
+  <!-- Gráfico tipos -->
   <div class="card" style="padding:18px;">
-    <div style="font-weight:700;color:var(--t1);margin-bottom:14px;">
-      <i class="bi bi-person-badge" style="color:#2E74B5;"></i> Por técnico
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;color:var(--t1);">
+        <i class="bi bi-tools" style="color:#2E74B5;"></i> Tipo de reparación
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="cambiarTipo('tiposChart','bar')"        class="chart-btn" id="btn-tipos-bar">Barras</button>
+        <button onclick="cambiarTipo('tiposChart','pie')"        class="chart-btn" id="btn-tipos-pie">Circular</button>
+        <button onclick="cambiarTipo('tiposChart','doughnut')"   class="chart-btn" id="btn-tipos-doughnut">Dona</button>
+        <button onclick="cambiarTipo('tiposChart','polarArea')"  class="chart-btn" id="btn-tipos-polarArea">Polar</button>
+      </div>
     </div>
-    <div class="tw"><table>
-      <thead><tr><th>Técnico</th><th>Solicitudes</th></tr></thead>
-      <tbody>
-        {% for tec in por_tecnico %}
-        <tr>
-          <td>{{ tec.nombre }}</td>
-          <td><strong class="acc">{{ tec.cantidad }}</strong></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="2" style="color:var(--t3);">Sin datos</td></tr>
-        {% endfor %}
-      </tbody>
-    </table></div>
+    <canvas id="tiposChart" height="200"></canvas>
   </div>
+
+  <!-- Gráfico por técnico -->
+  <div class="card" style="padding:18px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;color:var(--t1);">
+        <i class="bi bi-person-badge" style="color:#2E74B5;"></i> Por técnico
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="cambiarTipo('tecChart','bar')"      class="chart-btn" id="btn-tec-bar">Barras</button>
+        <button onclick="cambiarTipo('tecChart','pie')"      class="chart-btn" id="btn-tec-pie">Circular</button>
+        <button onclick="cambiarTipo('tecChart','doughnut')" class="chart-btn" id="btn-tec-doughnut">Dona</button>
+      </div>
+    </div>
+    <canvas id="tecChart" height="200"></canvas>
+  </div>
+
+  <!-- Gráfico mensual -->
+  <div class="card" style="padding:18px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px;">
+      <div style="font-weight:700;color:var(--t1);">
+        <i class="bi bi-graph-up" style="color:#2E74B5;"></i> Últimos 6 meses
+      </div>
+      <div style="display:flex;gap:4px;">
+        <button onclick="cambiarTipo('mesesChart','line')" class="chart-btn" id="btn-meses-line">Línea</button>
+        <button onclick="cambiarTipo('mesesChart','bar')"  class="chart-btn" id="btn-meses-bar">Barras</button>
+      </div>
+    </div>
+    <canvas id="mesesChart" height="200"></canvas>
+  </div>
+
 </div>
 
+<!-- TABLA RECIENTES -->
 <div class="card" style="padding:18px;">
   <div style="font-weight:700;color:var(--t1);margin-bottom:14px;">
     <i class="bi bi-clock-history" style="color:#2E74B5;"></i> Últimas 10 solicitudes
@@ -73,16 +128,15 @@
     <tbody>
       {% for sol in recientes %}
       <tr>
-        <td><strong class="mono acc">#S-{{ sol.id }}</strong></td>
-        <td>{{ sol.cliente.nombre }}</td>
-        <td>{{ sol.equipo.marca }} {{ sol.equipo.modelo }}</td>
+        <td><a href="{% url 'detalle_solicitud' sol.pk %}" class="mono acc">#S-{{ sol.id }}</a></td>
+        <td>{{ sol.cliente.nombre_completo }}</td>
+        <td>{{ sol.equipo.get_marca_display }} {{ sol.equipo.modelo }}</td>
         <td>{{ sol.detalle.tecnico.get_full_name|default:"Sin asignar" }}</td>
         <td>
-          {% if sol.estado == 'pendiente' %}<span class="badge" style="background:rgba(239,159,39,.15);color:#EF9F27;border:1px solid rgba(239,159,39,.3);">Pendiente</span>
-          {% elif sol.estado == 'proceso' %}<span class="badge" style="background:rgba(46,116,181,.15);color:#2E74B5;border:1px solid rgba(46,116,181,.3);">En proceso</span>
-          {% elif sol.estado == 'finalizado' %}<span class="badge" style="background:rgba(29,158,117,.15);color:var(--success);border:1px solid rgba(29,158,117,.3);">Finalizado</span>
-          {% elif sol.estado == 'entregado' %}<span class="badge" style="background:rgba(0,201,167,.15);color:var(--accent);border:1px solid rgba(0,201,167,.3);">Entregado</span>
-          {% endif %}
+          {% if sol.estado == 'pendiente' %}<span class="badge bm">Pendiente</span>
+          {% elif sol.estado == 'proceso' %}<span class="badge bpr">En proceso</span>
+          {% elif sol.estado == 'finalizado' %}<span class="badge bf">Finalizado</span>
+          {% else %}<span class="badge bl">Entregado</span>{% endif %}
         </td>
         <td class="mono" style="font-size:.78rem;">{{ sol.fecha_ingreso|date:"d/m/Y" }}</td>
       </tr>
@@ -91,9 +145,101 @@
   </table></div>
 </div>
 
-<div style="margin-top:16px;">
-  <a href="{% url 'reportes' %}" class="btn btn-o">
-    <i class="bi bi-arrow-left"></i> Volver a Reportes
-  </a>
-</div>
+<style>
+.chart-btn {
+  font-size:.72rem;padding:3px 9px;border-radius:20px;cursor:pointer;
+  border:1px solid var(--border);background:var(--surface);color:var(--t2);
+  transition:all .15s;
+}
+.chart-btn:hover,.chart-btn.activo {
+  background:var(--accent);color:#000;border-color:var(--accent);
+}
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+const COLORES = ['#5B8DEE','#00C9A7','#EF9F27','#E8445A','#A78BFA','#34D399'];
+
+// Datos desde Django
+const datosEstados = {
+  labels: ['Pendiente','En proceso','Finalizado','Entregado'],
+  data:   [{{ estados.pendiente }},{{ estados.proceso }},{{ estados.finalizado }},{{ estados.entregado }}]
+};
+const datosTipos = {
+  labels: [{% for l,c in tipos.items %}'{{ l }}',{% endfor %}],
+  data:   [{% for l,c in tipos.items %}{{ c }},{% endfor %}]
+};
+const datosTec = {
+  labels: [{% for t in por_tecnico %}'{{ t.nombre }}',{% endfor %}],
+  data:   [{% for t in por_tecnico %}{{ t.cantidad }},{% endfor %}]
+};
+const datosMeses = {
+  labels: {{ meses_labels|safe }},
+  data:   {{ meses_data|safe }}
+};
+
+// Registro de instancias
+const charts = {};
+
+function crearChart(id, tipo, datos, color) {
+  const ctx = document.getElementById(id).getContext('2d');
+  const esBarra = (tipo === 'bar');
+  charts[id] = new Chart(ctx, {
+    type: tipo,
+    data: {
+      labels: datos.labels,
+      datasets: [{
+        label: 'Cantidad',
+        data: datos.data,
+        backgroundColor: esBarra ? color + '99' : COLORES,
+        borderColor:     esBarra ? color        : COLORES,
+        borderWidth: 1,
+        tension: 0.4,
+        fill: tipo === 'line',
+      }]
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { display: tipo !== 'bar' } },
+      scales: esBarra ? {
+        y: { beginAtZero: true, ticks: { stepSize: 1 } }
+      } : {}
+    }
+  });
+}
+
+function cambiarTipo(id, nuevoTipo) {
+  // Marcar botón activo
+  document.querySelectorAll(`[id^="btn-${id.replace('Chart','')}"]`)
+    .forEach(b => b.classList.remove('activo'));
+  const btnId = `btn-${id.replace('Chart','')}-${nuevoTipo}`;
+  const btn = document.getElementById(btnId);
+  if (btn) btn.classList.add('activo');
+
+  // Recrear chart
+  charts[id].destroy();
+  const canvas = document.getElementById(id);
+  const colorMap = {
+    estadosChart: '#EF9F27', tiposChart: '#5B8DEE',
+    tecChart:     '#00C9A7', mesesChart: '#5B8DEE'
+  };
+  const datosMap = {
+    estadosChart: datosEstados, tiposChart: datosTipos,
+    tecChart:     datosTec,     mesesChart: datosMeses
+  };
+  crearChart(id, nuevoTipo, datosMap[id], colorMap[id]);
+}
+
+// Inicializar
+document.addEventListener('DOMContentLoaded', () => {
+  crearChart('estadosChart', 'pie',  datosEstados, '#EF9F27');
+  crearChart('tiposChart',   'bar',  datosTipos,   '#5B8DEE');
+  crearChart('tecChart',     'bar',  datosTec,     '#00C9A7');
+  crearChart('mesesChart',   'line', datosMeses,   '#5B8DEE');
+
+  // Marcar botones iniciales
+  ['btn-estados-pie','btn-tipos-bar','btn-tec-bar','btn-meses-line']
+    .forEach(id => { const b=document.getElementById(id); if(b) b.classList.add('activo'); });
+});
+</script>
 {% endblock %}

@@ -1,16 +1,14 @@
+import datetime
+from django.db.models.deletion import ProtectedError
 from django.shortcuts import render, redirect
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from .models import Solicitud, Cliente, Equipo, Usuario
-from .forms import ClienteForm, EquipoForm
-from .forms import ClienteForm, EquipoForm, SolicitudForm, CambiarEstadoForm, AsignarTecnicoForm
-from .forms import (ClienteForm, EquipoForm, SolicitudForm, CambiarEstadoForm, AsignarTecnicoForm,UsuarioForm, DiagnosticoForm, AvanceForm)
-from .models import (Usuario, Cliente, Equipo, Solicitud,DetalleSolicitud, HistorialEstado)
-from .forms import ClienteForm, EquipoForm, SolicitudForm, CambiarEstadoForm, AsignarTecnicoForm, UsuarioForm
-from .forms import (ClienteForm, EquipoForm, SolicitudForm, CambiarEstadoForm, AsignarTecnicoForm, UsuarioForm, DiagnosticoForm)
-from .models import (Usuario, Cliente, Equipo, Solicitud,DetalleSolicitud, HistorialEstado, Avance)
-from .models import (Usuario, Cliente, Equipo, Solicitud,DetalleSolicitud, HistorialEstado, Avance,Repuesto, Costo)
+from .models import (Usuario, Cliente, Equipo, Solicitud, DetalleSolicitud,
+                     HistorialEstado, Avance, Repuesto, Costo, AmpliacionTiempo)
+from .forms import (ClienteForm, EquipoForm, EquipoUpdateForm, SolicitudForm,
+                    CambiarEstadoForm, AsignarTecnicoForm, UsuarioForm,
+                    DiagnosticoForm, AvanceForm, AmpliacionTiempoForm)
 
 
 # ── LOGIN ──────────────────────────────────────────────────────
@@ -138,9 +136,12 @@ def registrar_cliente(request):
     if request.method == 'POST':
         form = ClienteForm(request.POST)
         if form.is_valid():
-            form.save()
-            messages.success(request, 'Cliente registrado correctamente.')
-            return redirect('consultar_clientes')
+            cliente = form.save()
+            messages.success(
+                request,
+                f'Cliente {cliente.nombre_completo} registrado. Ahora registra su equipo.'
+            )
+            return redirect(f'/equipos/registrar/?cliente_id={cliente.pk}')
     else:
         form = ClienteForm()
     return render(request, 'core/clientes/registrar.html', {'form': form})
@@ -192,19 +193,35 @@ def consultar_equipos(request):
 def registrar_equipo(request):
     if request.user.rol == 'tec':
         return redirect('dashboard')
+
+    cliente_id = request.GET.get('cliente_id') or request.POST.get('cliente_id_hidden')
+    cliente_fijo = None
+    if cliente_id:
+        try:
+            cliente_fijo = Cliente.objects.get(pk=cliente_id)
+        except Cliente.DoesNotExist:
+            cliente_fijo = None
+
     if request.method == 'POST':
         form = EquipoForm(request.POST)
         if form.is_valid():
-            form.save()
+            equipo = form.save()
             messages.success(request, 'Equipo registrado correctamente.')
+            if cliente_fijo:
+                return redirect(
+                    f'/solicitudes/registrar/?cliente_id={cliente_fijo.pk}&equipo_id={equipo.pk}'
+                )
             return redirect('consultar_equipos')
     else:
-        form = EquipoForm()
-    return render(request, 'core/equipos/registrar.html', {'form': form})
+        initial = {}
+        if cliente_fijo:
+            initial['cliente'] = cliente_fijo
+        form = EquipoForm(initial=initial)
 
-    from .models import (Usuario, Cliente, Equipo, Solicitud,
-                     DetalleSolicitud, HistorialEstado)
-import datetime
+    return render(request, 'core/equipos/registrar.html', {
+        'form':         form,
+        'cliente_fijo': cliente_fijo,
+    })
 
 
 # ── MOTOR DE ESTIMACIÓN DE TIEMPO ─────────────────────────────
@@ -227,17 +244,35 @@ def calcular_tiempo_estimado(tipo, prioridad, fecha_ingreso):
 def registrar_solicitud(request):
     if request.user.rol == 'tec':
         return redirect('consultar_solicitudes')
+
+    # Pre-vinculación desde flujo automático
+    cliente_id   = request.GET.get('cliente_id') or request.POST.get('cliente_id_hidden')
+    equipo_id    = request.GET.get('equipo_id')  or request.POST.get('equipo_id_hidden')
+    cliente_fijo = None
+    equipo_fijo  = None
+    if cliente_id:
+        try:
+            cliente_fijo = Cliente.objects.get(pk=cliente_id)
+        except Cliente.DoesNotExist:
+            pass
+    if equipo_id:
+        try:
+            equipo_fijo = Equipo.objects.get(pk=equipo_id)
+        except Equipo.DoesNotExist:
+            pass
+
     if request.method == 'POST':
         form = SolicitudForm(request.POST)
         if form.is_valid():
             solicitud = form.save(commit=False)
-            # Validar que el equipo pertenezca al cliente
             if solicitud.equipo.cliente != solicitud.cliente:
                 form.add_error('equipo',
                     'El equipo seleccionado no pertenece al cliente elegido.')
-                return render(request, 'core/solicitudes/registrar.html',
-                              {'form': form})
-            # Validar solicitud duplicada
+                return render(request, 'core/solicitudes/registrar.html', {
+                    'form': form,
+                    'cliente_fijo': cliente_fijo,
+                    'equipo_fijo':  equipo_fijo,
+                })
             duplicada = Solicitud.objects.filter(
                 cliente    = solicitud.cliente,
                 equipo     = solicitud.equipo,
@@ -245,11 +280,14 @@ def registrar_solicitud(request):
             ).exists()
             if duplicada:
                 form.add_error(None,
-                    f'Ya existe una solicitud activa para {solicitud.cliente.nombre} '
+                    f'Ya existe una solicitud activa para {solicitud.cliente.nombre_completo} '
                     f'con el equipo {solicitud.equipo.marca} {solicitud.equipo.modelo}. '
                     f'Finaliza esa solicitud antes de crear una nueva.')
-                return render(request, 'core/solicitudes/registrar.html',
-                              {'form': form})
+                return render(request, 'core/solicitudes/registrar.html', {
+                    'form': form,
+                    'cliente_fijo': cliente_fijo,
+                    'equipo_fijo':  equipo_fijo,
+                })
             dias, fecha_est, tiempo_texto = calcular_tiempo_estimado(
                 solicitud.tipo_reparacion,
                 solicitud.prioridad,
@@ -269,10 +307,20 @@ def registrar_solicitud(request):
             messages.success(request,
                 f'Solicitud #{solicitud.id} registrada. '
                 f'Tiempo estimado: {tiempo_texto}.')
-            return redirect('consultar_solicitudes')
+            return redirect('detalle_solicitud', pk=solicitud.pk)
     else:
-        form = SolicitudForm()
-    return render(request, 'core/solicitudes/registrar.html', {'form': form})
+        initial = {}
+        if cliente_fijo:
+            initial['cliente'] = cliente_fijo
+        if equipo_fijo:
+            initial['equipo'] = equipo_fijo
+        form = SolicitudForm(initial=initial)
+
+    return render(request, 'core/solicitudes/registrar.html', {
+        'form':         form,
+        'cliente_fijo': cliente_fijo,
+        'equipo_fijo':  equipo_fijo,
+    })
 
 
 # ── CONSULTAR SOLICITUDES ──────────────────────────────────────
@@ -360,20 +408,90 @@ def cambiar_estado(request, pk):
 # ── ASIGNAR TÉCNICO ────────────────────────────────────────────
 @login_required(login_url='login')
 def asignar_tecnico(request, pk):
+    if request.user.rol not in ['admin', 'recep']:
+        return redirect('detalle_solicitud', pk=pk)
+
     solicitud = Solicitud.objects.get(pk=pk)
-    detalle, _ = DetalleSolicitud.objects.get_or_create(solicitud=solicitud)
+
+    # Mapeo tipo de reparación → especialidad preferida
+    MAPA_TIPO_ESP = {
+        'hardware':   'hardware',
+        'software':   'software',
+        'preventivo': 'general',
+        'revision':   'general',
+    }
+    esp_ideal = MAPA_TIPO_ESP.get(solicitud.tipo_reparacion, 'general')
+
+    # Todos los técnicos
+    tecnicos = Usuario.objects.filter(rol='tec')
+
+    # Separar libres y ocupados
+    tecnicos_libres  = []
+    tecnicos_ocupados = []
+
+    for tec in tecnicos:
+        activos = Solicitud.objects.filter(
+            detalle__tecnico=tec,
+            estado__in=['pendiente', 'proceso']
+        ).count()
+        if activos == 0:
+            tecnicos_libres.append(tec)
+        else:
+            # fecha estimada de desocupación = fecha_estimada más próxima
+            proxima = Solicitud.objects.filter(
+                detalle__tecnico=tec,
+                estado__in=['pendiente', 'proceso'],
+                fecha_estimada__isnull=False
+            ).order_by('fecha_estimada').first()
+            tecnicos_ocupados.append({
+                'tec':       tec,
+                'activos':   activos,
+                'proxima':   proxima.fecha_estimada if proxima else None,
+            })
+
+    # Ordenar ocupados por fecha de desocupación
+    tecnicos_ocupados.sort(key=lambda x: (x['proxima'] is None, x['proxima']))
+
+    # Calcular recomendación entre los libres
+    recomendado = None
+    if tecnicos_libres:
+        def puntaje(tec):
+            # 0 = mejor, mayor = peor
+            match_esp = 0 if tec.especialidad == esp_ideal else (1 if tec.especialidad == 'general' else 2)
+            historico = Solicitud.objects.filter(detalle__tecnico=tec).count()
+            return (match_esp, historico)
+        recomendado = min(tecnicos_libres, key=puntaje)
+
     if request.method == 'POST':
         form = AsignarTecnicoForm(request.POST)
         if form.is_valid():
-            detalle.tecnico = form.cleaned_data['tecnico']
-            detalle.save()
-            messages.success(request, 'Técnico asignado correctamente.')
+            tec_id = form.cleaned_data['tecnico'].pk
+            tec_obj = Usuario.objects.get(pk=tec_id)
+            det = solicitud.detalle
+            det.tecnico = tec_obj
+            det.save()
+            HistorialEstado.objects.create(
+                solicitud    = solicitud,
+                usuario      = request.user,
+                estado_antes = solicitud.estado,
+                estado_nuevo = 'proceso',
+                observacion  = f'Técnico asignado: {tec_obj.get_full_name() or tec_obj.username}'
+            )
+            solicitud.estado = 'proceso'
+            solicitud.save()
+            messages.success(request, f'Técnico {tec_obj.get_full_name() or tec_obj.username} asignado correctamente.')
             return redirect('detalle_solicitud', pk=pk)
     else:
         form = AsignarTecnicoForm()
+
     return render(request, 'core/solicitudes/asignar_tecnico.html', {
-        'form':      form,
-        'solicitud': solicitud,
+        'solicitud':         solicitud,
+        'form':              form,
+        'tecnicos_libres':   tecnicos_libres,
+        'tecnicos_ocupados': tecnicos_ocupados,
+        'recomendado':       recomendado,
+        'esp_ideal':         esp_ideal,
+        'hay_libres':        len(tecnicos_libres) > 0,
     })
 
     # ── REGISTRAR USUARIO ──────────────────────────────────────────
@@ -493,13 +611,14 @@ def reporte_solicitudes(request):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('dashboard')
 
-    total    = Solicitud.objects.count()
-    estados  = {
-        'Pendiente':   Solicitud.objects.filter(estado='pendiente').count(),
-        'En proceso':  Solicitud.objects.filter(estado='proceso').count(),
-        'Finalizado':  Solicitud.objects.filter(estado='finalizado').count(),
-        'Entregado':   Solicitud.objects.filter(estado='entregado').count(),
+    total   = Solicitud.objects.count()
+    estados = {
+        'pendiente':  Solicitud.objects.filter(estado='pendiente').count(),
+        'proceso':    Solicitud.objects.filter(estado='proceso').count(),
+        'finalizado': Solicitud.objects.filter(estado='finalizado').count(),
+        'entregado':  Solicitud.objects.filter(estado='entregado').count(),
     }
+
     tipos = {}
     for t, label in Solicitud.TIPOS_REP:
         tipos[label] = Solicitud.objects.filter(tipo_reparacion=t).count()
@@ -512,16 +631,52 @@ def reporte_solicitudes(request):
             'cantidad': cant,
         })
 
+    # Solicitudes por mes — últimos 6 meses
+    hoy = datetime.date.today()
+    meses_labels = []
+    meses_data   = []
+    for i in range(5, -1, -1):
+        year  = hoy.year
+        month = hoy.month - i
+        while month <= 0:
+            month += 12
+            year  -= 1
+        count = Solicitud.objects.filter(
+            fecha_ingreso__year=year,
+            fecha_ingreso__month=month
+        ).count()
+        meses_labels.append(datetime.date(year, month, 1).strftime('%b %Y'))
+        meses_data.append(count)
+
+    # Marca más reparada
+    from django.db.models import Count
+    marca_top = (Equipo.objects
+                 .filter(solicitudes__isnull=False)
+                 .values('marca')
+                 .annotate(total=Count('solicitudes'))
+                 .order_by('-total')
+                 .first())
+
+    # Tasa de resolución
+    resueltas = estados['finalizado'] + estados['entregado']
+    tasa = round((resueltas / total * 100), 1) if total else 0
+
     recientes = Solicitud.objects.select_related(
         'cliente', 'equipo', 'detalle__tecnico'
     ).order_by('-creado_en')[:10]
 
+    import json
     return render(request, 'core/reportes/solicitudes.html', {
-        'total':       total,
-        'estados':     estados,
-        'tipos':       tipos,
-        'por_tecnico': por_tecnico,
-        'recientes':   recientes,
+        'total':         total,
+        'estados':       estados,
+        'tipos':         tipos,
+        'por_tecnico':   por_tecnico,
+        'recientes':     recientes,
+        'meses_labels':  json.dumps(meses_labels),
+        'meses_data':    json.dumps(meses_data),
+        'marca_top':     marca_top,
+        'tasa':          tasa,
+        'resueltas':     resueltas,
     })
 
 
@@ -531,43 +686,65 @@ def reporte_tiempos(request):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('dashboard')
 
-    import re
+    import json
+    from decimal import Decimal
+    from django.db.models import Avg, Sum
+
     tiempos_por_tipo = {}
     for t, label in Solicitud.TIPOS_REP:
         sols = Solicitud.objects.filter(tipo_reparacion=t)
-        total_horas = 0
-        count = 0
-        for s in sols:
-            if s.tiempo_estimado_texto:
-                m = re.search(r'\d+', s.tiempo_estimado_texto)
-                if m:
-                    total_horas += int(m.group())
-                    count += 1
-        promedio = round(total_horas / count, 1) if count else 0
+        sols_con_tiempo = sols.filter(tiempo_estimado_horas__isnull=False)
+        agg = sols_con_tiempo.aggregate(
+            total=Sum('tiempo_estimado_horas'),
+            promedio=Avg('tiempo_estimado_horas')
+        )
+        total_horas = float(agg['total'] or 0)
+        promedio    = round(float(agg['promedio'] or 0), 1)
         tiempos_por_tipo[label] = {
-            'cantidad': sols.count(),
-            'promedio': promedio,
-            'total_horas': total_horas,
+            'cantidad':    sols.count(),
+            'promedio':    promedio,
+            'total_horas': round(total_horas, 1),
         }
 
-    sols_con_tiempo = [
-        s for s in Solicitud.objects.all()
-        if s.tiempo_estimado_texto and re.search(r'\d+', s.tiempo_estimado_texto)
-    ]
-    promedio_general = 0
-    if sols_con_tiempo:
-        total = sum(
-            int(re.search(r'\d+', s.tiempo_estimado_texto).group())
-            for s in sols_con_tiempo
-        )
-        promedio_general = round(total / len(sols_con_tiempo), 1)
+    agg_general = Solicitud.objects.filter(
+        tiempo_estimado_horas__isnull=False
+    ).aggregate(
+        total=Sum('tiempo_estimado_horas'),
+        promedio=Avg('tiempo_estimado_horas')
+    )
+    total_horas_acum = round(float(agg_general['total'] or 0), 1)
+    promedio_general = round(float(agg_general['promedio'] or 0), 1)
+
+    tipos_con_datos = {k: v for k, v in tiempos_por_tipo.items() if v['promedio'] > 0}
+    tipo_rapido = min(tipos_con_datos.items(), key=lambda x: x[1]['promedio'])[0] if tipos_con_datos else '—'
+    tipo_lento  = max(tipos_con_datos.items(), key=lambda x: x[1]['promedio'])[0] if tipos_con_datos else '—'
+
+    chart_labels    = json.dumps(list(tiempos_por_tipo.keys()))
+    chart_promedios = json.dumps([v['promedio']    for v in tiempos_por_tipo.values()])
+    chart_totales   = json.dumps([v['total_horas'] for v in tiempos_por_tipo.values()])
+    chart_cantidad  = json.dumps([v['cantidad']    for v in tiempos_por_tipo.values()])
+
+    tiempos_prioridad = {}
+    for p, label in Solicitud.PRIORIDADES:
+        agg_p = Solicitud.objects.filter(
+            prioridad=p, tiempo_estimado_horas__isnull=False
+        ).aggregate(promedio=Avg('tiempo_estimado_horas'))
+        tiempos_prioridad[label] = round(float(agg_p['promedio'] or 0), 1)
 
     return render(request, 'core/reportes/tiempos.html', {
-        'tiempos_por_tipo': tiempos_por_tipo,
-        'promedio_general': promedio_general,
+        'tiempos_por_tipo':  tiempos_por_tipo,
+        'promedio_general':  promedio_general,
         'total_solicitudes': Solicitud.objects.count(),
+        'total_horas_acum':  total_horas_acum,
+        'tipo_rapido':       tipo_rapido,
+        'tipo_lento':        tipo_lento,
+        'chart_labels':      chart_labels,
+        'chart_promedios':   chart_promedios,
+        'chart_totales':     chart_totales,
+        'chart_cantidad':    chart_cantidad,
+        'tiempos_prioridad': json.dumps(tiempos_prioridad),
+        'prioridad_labels':  json.dumps(list(tiempos_prioridad.keys())),
     })
-
 
 # ── REPORTE INGRESOS ───────────────────────────────────────────
 @login_required(login_url='login')
@@ -575,21 +752,71 @@ def reporte_ingresos(request):
     if request.user.rol != 'admin':
         return redirect('dashboard')
 
+    import json
+    from django.db.models import Sum
+
     costos = Costo.objects.select_related('solicitud__cliente').all()
-    total_ingresos  = sum(c.total      for c in costos)
-    total_mano_obra = sum(c.mano_obra  for c in costos)
+    total_ingresos  = sum(c.total     for c in costos)
+    total_mano_obra = sum(c.mano_obra for c in costos)
     total_repuestos = total_ingresos - total_mano_obra
+    ticket_promedio = round(total_ingresos / costos.count(), 2) if costos.count() else 0
+
+    # Ingresos por mes — últimos 6 meses
+    hoy = datetime.date.today()
+    meses_labels  = []
+    meses_ingresos = []
+    meses_mano    = []
+    for i in range(5, -1, -1):
+        year  = hoy.year
+        month = hoy.month - i
+        while month <= 0:
+            month += 12; year -= 1
+        sols_mes = Costo.objects.filter(
+            solicitud__fecha_ingreso__year=year,
+            solicitud__fecha_ingreso__month=month
+        )
+        ing = sum(c.total     for c in sols_mes)
+        man = sum(c.mano_obra for c in sols_mes)
+        meses_labels.append(datetime.date(year, month, 1).strftime('%b %Y'))
+        meses_ingresos.append(float(ing))
+        meses_mano.append(float(man))
+
+    # Ingresos por tipo de reparación
+    ingresos_tipo = {}
+    for t, label in Solicitud.TIPOS_REP:
+        sols_tipo = Costo.objects.filter(solicitud__tipo_reparacion=t)
+        ingresos_tipo[label] = float(sum(c.total for c in sols_tipo))
+
+    # Técnico con más ingresos generados
+    tec_ingresos = []
+    for tec in Usuario.objects.filter(rol='tec'):
+        ing = sum(
+            c.total for c in Costo.objects.filter(
+                solicitud__detalle__tecnico=tec
+            )
+        )
+        tec_ingresos.append({'nombre': tec.get_full_name() or tec.username, 'total': float(ing)})
+    tec_ingresos.sort(key=lambda x: x['total'], reverse=True)
 
     ultimos = Costo.objects.select_related(
         'solicitud__cliente', 'solicitud__equipo'
     ).order_by('-solicitud__creado_en')[:10]
 
     return render(request, 'core/reportes/ingresos.html', {
-        'total_ingresos':  total_ingresos,
-        'total_mano_obra': total_mano_obra,
-        'total_repuestos': total_repuestos,
-        'ultimos':         ultimos,
-        'total_registros': costos.count(),
+        'total_ingresos':   total_ingresos,
+        'total_mano_obra':  total_mano_obra,
+        'total_repuestos':  total_repuestos,
+        'ticket_promedio':  ticket_promedio,
+        'total_registros':  costos.count(),
+        'ultimos':          ultimos,
+        'tec_ingresos':     tec_ingresos,
+        'meses_labels':     json.dumps(meses_labels),
+        'meses_ingresos':   json.dumps(meses_ingresos),
+        'meses_mano':       json.dumps(meses_mano),
+        'ingresos_tipo_labels': json.dumps(list(ingresos_tipo.keys())),
+        'ingresos_tipo_data':   json.dumps(list(ingresos_tipo.values())),
+        'tec_labels': json.dumps([t['nombre'] for t in tec_ingresos]),
+        'tec_data':   json.dumps([t['total']  for t in tec_ingresos]),
     })
 
     # ── API: EQUIPOS POR CLIENTE ───────────────────────────────────
@@ -917,4 +1144,138 @@ def historial_equipo(request, pk):
     return render(request, 'core/equipos/historial.html', {
         'equipo':      equipo,
         'solicitudes': solicitudes,
+    })
+
+    # ── ACTUALIZAR EQUIPO ──────────────────────────────────────────
+@login_required(login_url='login')
+def actualizar_equipo(request, pk):
+    if request.user.rol == 'tec':
+        return redirect('dashboard')
+    equipo = Equipo.objects.select_related('cliente').get(pk=pk)
+    if request.method == 'POST':
+        form = EquipoUpdateForm(request.POST, instance=equipo)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Equipo actualizado correctamente.')
+            return redirect('consultar_equipos')
+    else:
+        form = EquipoUpdateForm(instance=equipo)
+    return render(request, 'core/equipos/actualizar.html', {
+        'form':   form,
+        'equipo': equipo,
+    })
+
+    # ── ELIMINAR CLIENTE ────────────────────────────────────────────
+@login_required(login_url='login')
+def eliminar_cliente(request, pk):
+    if request.user.rol != 'admin':
+        messages.error(request, 'Solo el administrador puede eliminar clientes.')
+        return redirect('consultar_clientes')
+    cliente = Cliente.objects.get(pk=pk)
+    if request.method == 'POST':
+        try:
+            
+            nombre = cliente.nombre_completo
+            cliente.delete()
+            messages.success(request, f'Cliente {nombre} eliminado correctamente.')
+            return redirect('consultar_clientes')
+        except ProtectedError:
+            messages.error(request,
+                f'No se puede eliminar a {cliente.nombre_completo} porque tiene '
+                f'equipos o solicitudes registradas. Elimínalos primero.')
+            return redirect('consultar_clientes')
+    return render(request, 'core/clientes/eliminar.html', {'cliente': cliente})
+
+
+# ── ELIMINAR EQUIPO ─────────────────────────────────────────────
+@login_required(login_url='login')
+def eliminar_equipo(request, pk):
+    if request.user.rol != 'admin':
+        messages.error(request, 'Solo el administrador puede eliminar equipos.')
+        return redirect('consultar_equipos')
+    equipo = Equipo.objects.select_related('cliente').get(pk=pk)
+    if request.method == 'POST':
+        try:
+            
+            desc = f'{equipo.get_marca_display()} {equipo.modelo}'
+            equipo.delete()
+            messages.success(request, f'Equipo {desc} eliminado correctamente.')
+            return redirect('consultar_equipos')
+        except ProtectedError:
+            messages.error(request,
+                'No se puede eliminar este equipo porque tiene solicitudes '
+                'registradas. Elimínalas primero.')
+            return redirect('consultar_equipos')
+    return render(request, 'core/equipos/eliminar.html', {'equipo': equipo})
+
+  # ── AMPLIACIÓN DE TIEMPO ────────────────────────────────────────
+@login_required(login_url='login')
+def solicitar_ampliacion(request, pk):
+    from decimal import Decimal
+    solicitud = Solicitud.objects.get(pk=pk)
+
+    if request.user.rol == 'tec':
+        try:
+            if solicitud.detalle.tecnico != request.user:
+                messages.error(request, 'Solo el técnico asignado puede solicitar ampliación.')
+                return redirect('detalle_solicitud', pk=pk)
+        except Exception:
+            messages.error(request, 'Esta solicitud no tiene técnico asignado.')
+            return redirect('detalle_solicitud', pk=pk)
+    elif request.user.rol not in ('admin', 'tec'):
+        return redirect('detalle_solicitud', pk=pk)
+
+    if request.method == 'POST':
+        form = AmpliacionTiempoForm(request.POST)
+        if form.is_valid():
+            cantidad = form.cleaned_data['cantidad']
+            unidad   = form.cleaned_data['unidad']
+            justif   = form.cleaned_data['justificacion']
+
+            AmpliacionTiempo.objects.create(
+                solicitud     = solicitud,
+                tecnico       = request.user,
+                cantidad      = cantidad,
+                unidad        = unidad,
+                justificacion = justif,
+            )
+
+            if solicitud.fecha_estimada:
+                if unidad == 'horas':
+                    delta = datetime.timedelta(hours=cantidad)
+                else:
+                    delta = datetime.timedelta(minutes=cantidad)
+                solicitud.fecha_estimada = solicitud.fecha_estimada + delta
+
+            sufijo = f'+{cantidad} {"h" if unidad == "horas" else "min"}'
+            if solicitud.tiempo_estimado_texto:
+                solicitud.tiempo_estimado_texto += f' ({sufijo})'
+            else:
+                solicitud.tiempo_estimado_texto = sufijo
+
+            delta_horas = Decimal(cantidad) if unidad == 'horas' else Decimal(cantidad) / 60
+            if solicitud.tiempo_estimado_horas is None:
+                solicitud.tiempo_estimado_horas = delta_horas
+            else:
+                solicitud.tiempo_estimado_horas += delta_horas
+
+            solicitud.save()
+
+            HistorialEstado.objects.create(
+                solicitud    = solicitud,
+                usuario      = request.user,
+                estado_antes = solicitud.estado,
+                estado_nuevo = solicitud.estado,
+                observacion  = f'Ampliación de tiempo: +{cantidad} {unidad}. '
+                               f'Justificación: {justif}'
+            )
+            messages.success(request,
+                f'Ampliación de {cantidad} {unidad} registrada correctamente.')
+            return redirect('detalle_solicitud', pk=pk)
+    else:
+        form = AmpliacionTiempoForm()
+
+    return render(request, 'core/solicitudes/ampliacion.html', {
+        'form':      form,
+        'solicitud': solicitud,
     })

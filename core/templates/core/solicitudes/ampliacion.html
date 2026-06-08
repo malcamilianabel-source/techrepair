@@ -1,0 +1,87 @@
+{% extends 'core/base.html' %}
+{% block title %}Ampliación de Tiempo — #S-{{ solicitud.id }}{% endblock %}
+{% block content %}
+<div class="bc">Inicio / Solicitudes / <a href="{% url 'detalle_solicitud' solicitud.pk %}">#S-{{ solicitud.id }}</a> / <span>Ampliación de Tiempo</span></div>
+
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--wg);color:var(--warn);">
+      <i class="bi bi-clock-history"></i>
+    </div>
+    Solicitar Ampliación de Tiempo
+  </div>
+  <div class="ps">Solicitud <strong class="mono acc">#S-{{ solicitud.id }}</strong> —
+    {{ solicitud.equipo.get_marca_display }} {{ solicitud.equipo.modelo }}</div>
+</div>
+
+{% if solicitud.tiempo_estimado_texto %}
+<div style="background:linear-gradient(135deg,rgba(91,141,238,.08),rgba(0,201,167,.05));
+  border:1px solid rgba(91,141,238,.25);border-radius:var(--r);
+  padding:14px 18px;margin-bottom:18px;font-size:.85rem;">
+  <span style="color:var(--t2);">Tiempo estimado actual:</span>
+  <strong style="color:var(--accent);margin-left:8px;font-family:monospace;">
+    {{ solicitud.tiempo_estimado_texto }}
+  </strong>
+  {% if solicitud.fecha_estimada %}
+  <span style="color:var(--t3);margin-left:12px;">· Entrega estimada: {{ solicitud.fecha_estimada }}</span>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card" style="max-width:540px;">
+  <div class="ct">Datos de la ampliación</div>
+  <form method="POST">
+    {% csrf_token %}
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px;">
+      <div class="fg">
+        <label class="fl">Tiempo adicional <span style="color:var(--danger);">*</span></label>
+        {{ form.cantidad }}
+        {% if form.cantidad.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.cantidad.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+      <div class="fg">
+        <label class="fl">Unidad <span style="color:var(--danger);">*</span></label>
+        {{ form.unidad }}
+        {% if form.unidad.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ form.unidad.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="fg" style="margin-bottom:18px;">
+      <label class="fl">Justificación <span style="color:var(--danger);">*</span></label>
+      {{ form.justificacion }}
+      {% if form.justificacion.errors %}
+      <span style="color:var(--danger);font-size:.72rem;">{{ form.justificacion.errors|join:", " }}</span>
+      {% endif %}
+    </div>
+    <div style="display:flex;gap:8px;padding-top:14px;border-top:1px solid var(--border);">
+      <button class="btn btn-p" type="submit">
+        <i class="bi bi-clock-fill"></i> Confirmar Ampliación
+      </button>
+      <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-o">
+        <i class="bi bi-x"></i> Cancelar
+      </a>
+    </div>
+  </form>
+</div>
+
+{% if solicitud.ampliaciones.exists %}
+<div class="card" style="max-width:540px;margin-top:18px;">
+  <div class="ct">Historial de ampliaciones</div>
+  {% for amp in solicitud.ampliaciones.all %}
+  <div style="padding:10px 0;border-bottom:1px solid var(--border);font-size:.83rem;">
+    <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+      <strong style="color:var(--accent);">+{{ amp.cantidad }} {{ amp.get_unidad_display }}</strong>
+      <span style="color:var(--t3);">{{ amp.fecha_hora|date:"d/m/Y H:i" }}</span>
+    </div>
+    <div style="color:var(--t2);">{{ amp.justificacion }}</div>
+    <div style="font-size:.75rem;color:var(--t3);margin-top:3px;">
+      Por: {{ amp.tecnico.get_full_name|default:amp.tecnico.username }}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+{% endblock %}
