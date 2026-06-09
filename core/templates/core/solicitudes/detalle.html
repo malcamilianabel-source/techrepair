@@ -4,6 +4,17 @@
 
 {% block content %}
 <div class="bc">Inicio / Solicitudes / <span>Detalle #S-{{ solicitud.id }}</span></div>
+
+{% if messages %}
+{% for msg in messages %}
+<div style="background:var(--sg);border:1px solid rgba(61,214,140,.3);color:var(--success);
+  padding:10px 14px;border-radius:var(--rs);font-size:.82rem;
+  display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+  <i class="bi bi-check-circle-fill"></i> {{ msg }}
+</div>
+{% endfor %}
+{% endif %}
+
 <div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px;">
   <div>
     <div class="pt">
@@ -15,10 +26,12 @@
     <div class="ps">Detalle completo de la orden de reparación</div>
   </div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
-  {% if request.user.rol == 'tec' or request.user.rol == 'admin' %}
+  {% if request.user.rol == 'admin' %}
+    {% if solicitud.estado != 'finalizado' and solicitud.estado != 'entregado' %}
     <a href="{% url 'cambiar_estado' solicitud.pk %}" class="btn btn-w btn-sm">
       <i class="bi bi-arrow-repeat"></i> Cambiar Estado
     </a>
+    {% endif %}
     <a href="{% url 'avance' solicitud.pk %}" class="btn btn-p btn-sm">
       <i class="bi bi-journal-text"></i> Bitácora
     </a>
@@ -34,27 +47,72 @@
     <a href="{% url 'costos' solicitud.pk %}" class="btn btn-o btn-sm">
       <i class="bi bi-currency-dollar"></i> Costos
     </a>
-    
+  {% elif request.user.rol == 'tec' and solicitud.estado != 'finalizado' and solicitud.estado != 'entregado' %}
+    <a href="{% url 'cambiar_estado' solicitud.pk %}" class="btn btn-w btn-sm">
+      <i class="bi bi-arrow-repeat"></i> Cambiar Estado
+    </a>
+    {% if not bitacora_completa %}
+    <a href="{% url 'avance' solicitud.pk %}" class="btn btn-p btn-sm">
+      <i class="bi bi-journal-text"></i> Bitácora
+    </a>
+    {% endif %}
+    <a href="{% url 'diagnostico' solicitud.pk %}" class="btn btn-p btn-sm">
+      <i class="bi bi-clipboard2-pulse-fill"></i> Diagnóstico
+    </a>
+    <a href="{% url 'solicitar_ampliacion' solicitud.pk %}" class="btn btn-w btn-sm">
+      <i class="bi bi-clock-history"></i> Ampliación de tiempo
+    </a>
+    <a href="{% url 'repuestos' solicitud.pk %}" class="btn btn-o btn-sm">
+      <i class="bi bi-box-seam-fill"></i> Repuestos
+    </a>
+    <a href="{% url 'costos' solicitud.pk %}" class="btn btn-o btn-sm">
+      <i class="bi bi-currency-dollar"></i> Costos
+    </a>
   {% endif %}
   {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
-    <a href="{% url 'asignar_tecnico' solicitud.pk %}" class="btn btn-o btn-sm">
-      <i class="bi bi-person-check"></i> Asignar Técnico
-    </a>
-    {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
-<a href="{% url 'reasignar_tecnico' solicitud.pk %}" class="btn btn-o btn-sm">
-  <i class="bi bi-arrow-left-right"></i> Reasignar Técnico
-</a>
-{% endif %}
+  {% if solicitud.estado != 'finalizado' and solicitud.estado != 'entregado' %}
+    {% if solicitud.detalle.tecnico %}
+      <a href="{% url 'asignar_tecnico' solicitud.pk %}" class="btn btn-o btn-sm">
+        <i class="bi bi-person-fill-gear"></i> Reasignar Técnico
+      </a>
+    {% else %}
+      <a href="{% url 'asignar_tecnico' solicitud.pk %}" class="btn btn-o btn-sm">
+        <i class="bi bi-person-check"></i> Asignar Técnico
+      </a>
+    {% endif %}
+  {% endif %}
   {% endif %}
   {% if solicitud.estado == 'finalizado' %}{% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
     <a href="{% url 'entrega' solicitud.pk %}" class="btn btn-s btn-sm">
       <i class="bi bi-box-arrow-up-right"></i> Entregar Equipo
     </a>
+    {% if solicitud.cliente.telefono %}
+    <a href="https://wa.me/51{{ solicitud.cliente.telefono }}?text=Hola%20{{ solicitud.cliente.nombre|urlencode }}%2C%20le%20informamos%20que%20su%20equipo%20{{ solicitud.equipo.marca|urlencode }}%20{{ solicitud.equipo.modelo|urlencode }}%20ya%20fue%20reparado%20y%20est%C3%A1%20listo%20para%20ser%20recogido%20en%20nuestro%20taller.%20%C2%A1Gracias%20por%20confiar%20en%20TechRepair!"
+       target="_blank" class="btn btn-sm" style="background:#25D366;color:#fff;">
+      <i class="bi bi-whatsapp"></i> Notificar cliente
+    </a>
+    {% endif %}
   {% endif %}{% endif %}
+  {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
+  {% if solicitud.ampliaciones.exists and solicitud.cliente.telefono %}{% with amp=solicitud.ampliaciones.last %}
+  <a href="https://wa.me/51{{ solicitud.cliente.telefono }}?text=Hola%20{{ solicitud.cliente.nombre|urlencode }}%2C%20le%20informamos%20que%20la%20reparaci%C3%B3n%20de%20su%20equipo%20{{ solicitud.equipo.marca|urlencode }}%20{{ solicitud.equipo.modelo|urlencode }}%20requiere%20un%20poco%20m%C3%A1s%20de%20tiempo.%20Motivo%3A%20{{ amp.justificacion|urlencode }}.%20Le%20avisaremos%20cuando%20est%C3%A9%20listo.%20Disculpe%20las%20molestias."
+     target="_blank" class="btn btn-sm" style="background:#25D366;color:#fff;">
+    <i class="bi bi-whatsapp"></i> Avisar demora
+  </a>
+  {% endwith %}{% endif %}
+  {% endif %}
   {% if solicitud.estado == 'finalizado' or solicitud.estado == 'entregado' %}
   <a href="{% url 'informe_pdf' solicitud.pk %}" target="_blank" class="btn btn-o btn-sm">
     <i class="bi bi-file-earmark-pdf-fill"></i> PDF
   </a>
+  {% endif %}
+  {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
+  {% if solicitud.estado != 'entregado' and solicitud.cliente.telefono %}
+  <a href="https://wa.me/51{{ solicitud.cliente.telefono }}?text=Hola%20{{ solicitud.cliente.nombre|urlencode }}%2C%20puede%20hacer%20seguimiento%20del%20estado%20de%20su%20equipo%20{{ solicitud.equipo.get_marca_display|urlencode }}%20{{ solicitud.equipo.modelo|urlencode }}%20en%20tiempo%20real%20desde%20el%20siguiente%20enlace%3A%20{{ seguimiento_url|urlencode }}"
+     target="_blank" class="btn btn-sm" style="background:#25D366;color:#fff;" title="Enviar link de seguimiento por WhatsApp">
+    <i class="bi bi-whatsapp"></i> Enviar seguimiento
+  </a>
+  {% endif %}
   {% endif %}
   {% if solicitud.estado == 'entregado' and request.user.rol == 'admin' %}
   <a href="{% url 'eliminar_solicitud' solicitud.pk %}"
@@ -105,11 +163,36 @@
       </div>
     </div>
 
-    <!-- TIEMPO ESTIMADO -->
-    {% if solicitud.tiempo_estimado_texto %}
+   <!-- TIEMPO ESTIMADO -->
+{% if solicitud.tiempo_estimado_texto %}
 <div style="background:linear-gradient(135deg,rgba(91,141,238,.08),rgba(0,201,167,.05));
   border:1px solid rgba(91,141,238,.25);border-radius:var(--r);padding:18px;">
   <div class="ct">⏱ tiempo estimado de entrega</div>
+
+  {% if solicitud.estado == 'finalizado' or solicitud.estado == 'entregado' %}
+  <!-- Finalizado → mostrar estado -->
+  <div style="display:flex;align-items:center;gap:16px;">
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:2.4rem;
+        font-weight:700;color:var(--success);line-height:1;">
+        Finalizado
+      </div>
+      <div style="font-size:.78rem;color:var(--t2);margin-top:4px;">
+        reparación completada
+      </div>
+    </div>
+    <div style="flex:1;">
+      <div style="font-size:.75rem;color:var(--t2);margin-bottom:5px;">
+        Tiempo que tomó:
+      </div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:1.05rem;
+        font-weight:600;color:var(--t2);">
+        {{ solicitud.tiempo_estimado_texto }}
+      </div>
+    </div>
+  </div>
+  {% elif solicitud.detalle and solicitud.detalle.tecnico %}
+  <!-- Tiene técnico asignado → mostrar tiempo real -->
   <div style="display:flex;align-items:flex-end;gap:16px;">
     <div>
       <div style="font-family:'JetBrains Mono',monospace;font-size:2.4rem;
@@ -125,9 +208,33 @@
         Fecha estimada de entrega:
       </div>
       <div style="font-family:'JetBrains Mono',monospace;font-size:1.05rem;
-        font-weight:700;color:var(--teal);">{{ solicitud.fecha_ingreso }}</div>
+        font-weight:700;color:var(--teal);">
+        {{ solicitud.fecha_estimada|date:"d/m/Y" }}
+      </div>
     </div>
   </div>
+
+  {% else %}
+  <!-- Sin técnico → EN ESPERA -->
+  <div style="display:flex;align-items:center;gap:16px;">
+    <div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:2rem;
+        font-weight:700;color:var(--warn);line-height:1;">
+        ⏳ EN ESPERA
+      </div>
+      <div style="font-size:.78rem;color:var(--t2);margin-top:6px;">
+        El tiempo comenzará a contar cuando se asigne un técnico.
+      </div>
+    </div>
+    <div style="flex:1;text-align:right;">
+      <span style="font-size:.75rem;color:var(--t3);">Tiempo estimado al asignar:</span><br>
+      <span style="font-family:'JetBrains Mono',monospace;color:var(--t2);font-size:.95rem;">
+        {{ solicitud.tiempo_estimado_texto }}
+      </span>
+    </div>
+  </div>
+  {% endif %}
+
 </div>
 {% endif %}
 
@@ -184,36 +291,81 @@
     </div>
   </div>
 
-  <!-- HISTORIAL -->
-  <div class="card">
-    <div class="ct">Historial de la solicitud</div>
-    {% if historial %}
-    <div class="tl">
-      {% for h in historial %}
-      <div class="tl-item">
-        <div class="tl-l">
-          <div class="tl-dot {% if forloop.last %}act{% else %}done{% endif %}"></div>
-          {% if not forloop.last %}<div class="tl-con"></div>{% endif %}
-        </div>
-        <div class="tl-c">
-          <div class="tl-t">{{ h.estado_antes }} → {{ h.estado_nuevo }}</div>
-          <div class="tl-m">
-            {{ h.fecha_hora|date:"d/m/Y H:i" }} —
-            {{ h.usuario.get_full_name|default:h.usuario.username }}
-          </div>
-          {% if h.observacion %}
-          <div class="tl-d">{{ h.observacion }}</div>
-          {% endif %}
-        </div>
+  <!-- COLUMNA DERECHA -->
+  <div style="display:flex;flex-direction:column;gap:16px;">
+
+    <!-- PROGRESO DE REPARACIÓN -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+        <div class="ct" style="margin-bottom:0;"><i class="bi bi-journal-text"></i> Progreso de reparación</div>
+        <span style="font-size:.7rem;color:var(--t3);font-family:'JetBrains Mono',monospace;">
+          {% with total=progreso_etapas|length completadas=0 %}
+          {% for k, label, av in progreso_etapas %}{% if av %}{% with completadas=completadas|add:1 %}{% endwith %}{% endif %}{% endfor %}
+          {{ progreso_etapas|length }} etapas
+          {% endwith %}
+        </span>
       </div>
-      {% endfor %}
+      <div style="display:flex;flex-direction:column;gap:0;">
+        {% for etapa_key, etapa_label, av in progreso_etapas %}
+        <div style="display:flex;gap:12px;{% if not forloop.last %}padding-bottom:14px;{% endif %}align-items:flex-start;">
+          <div style="display:flex;flex-direction:column;align-items:center;flex-shrink:0;width:14px;">
+            <div style="width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:3px;
+              {% if av %}background:var(--success);box-shadow:0 0 6px rgba(61,214,140,.4);
+              {% else %}background:transparent;border:2px solid var(--border);{% endif %}">
+            </div>
+            {% if not forloop.last %}
+            <div style="width:2px;background:{% if av %}var(--success){% else %}var(--border){% endif %};flex:1;margin-top:3px;min-height:14px;"></div>
+            {% endif %}
+          </div>
+          <div style="flex:1;padding-bottom:{% if not forloop.last %}0{% else %}0{% endif %}px;">
+            <div style="font-size:.81rem;font-weight:600;color:{% if av %}var(--t1){% else %}var(--t3){% endif %};">
+              {{ etapa_label }}
+            </div>
+            {% if av %}
+            <div style="font-size:.71rem;color:var(--t3);margin-top:2px;">
+              {{ av.fecha_hora|date:"d/m/Y H:i" }} — {{ av.usuario.get_full_name|default:av.usuario.username }}
+            </div>
+            {% else %}
+            <div style="font-size:.71rem;color:var(--t3);margin-top:1px;">Pendiente</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
     </div>
-    {% else %}
-    <div style="text-align:center;padding:20px;color:var(--t3);">
-      Sin movimientos registrados.
+
+    <!-- HISTORIAL -->
+    <div class="card">
+      <div class="ct">Historial de la solicitud</div>
+      {% if historial %}
+      <div class="tl">
+        {% for h in historial %}
+        <div class="tl-item">
+          <div class="tl-l">
+            <div class="tl-dot {% if forloop.last %}act{% else %}done{% endif %}"></div>
+            {% if not forloop.last %}<div class="tl-con"></div>{% endif %}
+          </div>
+          <div class="tl-c">
+            <div class="tl-t">{{ h.estado_antes }} → {{ h.estado_nuevo }}</div>
+            <div class="tl-m">
+              {{ h.fecha_hora|date:"d/m/Y H:i" }} —
+              {{ h.usuario.get_full_name|default:h.usuario.username }}
+            </div>
+            {% if h.observacion %}
+            <div class="tl-d">{{ h.observacion }}</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="text-align:center;padding:20px;color:var(--t3);">
+        Sin movimientos registrados.
+      </div>
+      {% endif %}
     </div>
-    {% endif %}
-  </div>
+
+  </div><!-- /columna derecha -->
 </div>
 
 <style>
@@ -236,4 +388,5 @@
 .tl-d{font-size:.79rem;color:var(--t2);margin-top:6px;padding:8px 11px;
   background:var(--surface);border-radius:var(--rs);border-left:2px solid var(--accent);}
 </style>
+
 {% endblock %}

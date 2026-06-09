@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Seguimiento de Reparación{% if not no_encontrado %} — #S-{{ solicitud.id }}{% endif %}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #0b0d12;
+      color: #e2e8f0;
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 32px 16px 64px;
+    }
+    a { color: #5b8dee; text-decoration: none; }
+
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 32px;
+    }
+    .header-logo {
+      width: 36px; height: 36px;
+      background: rgba(91,141,238,.15);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.1rem; color: #5b8dee;
+    }
+    .header-name {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: #e2e8f0;
+      letter-spacing: -.3px;
+    }
+    .header-name span { color: #5b8dee; }
+
+    .container {
+      width: 100%;
+      max-width: 520px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .card {
+      background: #141720;
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: 14px;
+      padding: 22px 24px;
+    }
+
+    .card-title {
+      font-size: .7rem;
+      font-weight: 700;
+      color: #5b8dee;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 9px 0;
+      border-bottom: 1px solid rgba(255,255,255,.05);
+      font-size: .85rem;
+    }
+    .info-row:last-child { border-bottom: none; }
+    .info-label { color: #94a3b8; }
+    .info-value { color: #e2e8f0; font-weight: 500; text-align: right; }
+
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: .72rem;
+      font-weight: 700;
+      letter-spacing: .3px;
+    }
+    .badge-pendiente  { background: rgba(245,166,35,.15); color: #f5a623; }
+    .badge-proceso    { background: rgba(91,141,238,.15);  color: #5b8dee; }
+    .badge-finalizado { background: rgba(61,214,140,.15);  color: #3dd68c; }
+    .badge-entregado  { background: rgba(0,201,167,.15);   color: #00c9a7; }
+
+    /* Timeline */
+    .tl { display: flex; flex-direction: column; gap: 0; }
+    .tl-item { display: flex; gap: 14px; align-items: flex-start; }
+    .tl-item:not(:last-child) { padding-bottom: 16px; }
+    .tl-line { display: flex; flex-direction: column; align-items: center; flex-shrink: 0; width: 14px; }
+    .tl-dot {
+      width: 12px; height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+    .tl-dot.done {
+      background: #3dd68c;
+      box-shadow: 0 0 6px rgba(61,214,140,.4);
+    }
+    .tl-dot.pending {
+      background: transparent;
+      border: 2px solid rgba(255,255,255,.12);
+    }
+    .tl-connector {
+      width: 2px;
+      flex: 1;
+      margin-top: 3px;
+      min-height: 14px;
+    }
+    .tl-connector.done  { background: #3dd68c; opacity: .4; }
+    .tl-connector.pending { background: rgba(255,255,255,.08); }
+    .tl-label { font-size: .83rem; font-weight: 600; }
+    .tl-label.done    { color: #e2e8f0; }
+    .tl-label.pending { color: #475569; }
+    .tl-meta { font-size: .71rem; color: #475569; margin-top: 2px; }
+
+    .footer {
+      margin-top: 32px;
+      text-align: center;
+      font-size: .75rem;
+      color: #475569;
+      line-height: 1.6;
+    }
+
+    .code-badge {
+      display: inline-block;
+      background: rgba(91,141,238,.1);
+      border: 1px solid rgba(91,141,238,.25);
+      color: #5b8dee;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.5rem;
+      font-weight: 700;
+      padding: 8px 20px;
+      border-radius: 10px;
+      letter-spacing: 1px;
+      margin-bottom: 6px;
+    }
+
+    .not-found {
+      text-align: center;
+      padding: 48px 24px;
+      color: #475569;
+    }
+    .not-found i { font-size: 3rem; display: block; margin-bottom: 16px; color: #334155; }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="header-logo"><i class="bi bi-tools"></i></div>
+    <div class="header-name">Tech<span>Repair</span></div>
+  </div>
+
+  <div class="container">
+
+  {% if no_encontrado %}
+    <div class="card">
+      <div class="not-found">
+        <i class="bi bi-search"></i>
+        <div style="font-size:1rem;font-weight:600;color:#94a3b8;margin-bottom:8px;">
+          Solicitud no encontrada
+        </div>
+        <div style="font-size:.83rem;">
+          Verifica el código con el taller.
+        </div>
+      </div>
+    </div>
+
+  {% else %}
+
+    <!-- CÓDIGO + ESTADO -->
+    <div class="card" style="text-align:center;">
+      <div style="margin-bottom:4px;font-size:.72rem;color:#475569;letter-spacing:.5px;text-transform:uppercase;">
+        Orden de servicio
+      </div>
+      <div class="code-badge">#S-{{ solicitud.id }}</div>
+      <div style="margin-top:10px;">
+        {% if solicitud.estado == 'pendiente' %}
+          <span class="badge badge-pendiente"><i class="bi bi-hourglass-split"></i> Pendiente</span>
+        {% elif solicitud.estado == 'proceso' %}
+          <span class="badge badge-proceso"><i class="bi bi-gear-fill"></i> En proceso</span>
+        {% elif solicitud.estado == 'finalizado' %}
+          <span class="badge badge-finalizado"><i class="bi bi-check-circle-fill"></i> Finalizado — listo para recoger</span>
+        {% elif solicitud.estado == 'entregado' %}
+          <span class="badge badge-entregado"><i class="bi bi-box-arrow-up-right"></i> Entregado</span>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- INFO DEL EQUIPO -->
+    <div class="card">
+      <div class="card-title">Información del equipo</div>
+      <div class="info-row">
+        <span class="info-label">Cliente</span>
+        <span class="info-value">{{ solicitud.cliente.nombre }} {{ solicitud.cliente.apellido }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Equipo</span>
+        <span class="info-value">{{ solicitud.equipo.get_marca_display }} {{ solicitud.equipo.modelo }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Tipo de servicio</span>
+        <span class="info-value">{{ solicitud.get_tipo_reparacion_display|default:"—" }}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Técnico</span>
+        <span class="info-value">
+          {% if solicitud.detalle.tecnico %}
+            {{ solicitud.detalle.tecnico.get_full_name|default:solicitud.detalle.tecnico.username }}
+          {% else %}
+            <span style="color:#475569;">Siendo asignado</span>
+          {% endif %}
+        </span>
+      </div>
+      {% if solicitud.fecha_estimada and solicitud.detalle.tecnico %}
+      <div class="info-row">
+        <span class="info-label">Fecha estimada</span>
+        <span class="info-value" style="color:#00c9a7;font-family:monospace;">
+          {{ solicitud.fecha_estimada|date:"d/m/Y" }}
+        </span>
+      </div>
+      {% endif %}
+    </div>
+
+    <!-- PROGRESO DE REPARACIÓN -->
+    <div class="card">
+      <div class="card-title">Progreso de reparación</div>
+      {% if progreso_etapas %}
+      <div class="tl">
+        {% for etapa_key, etapa_label, av in progreso_etapas %}
+        <div class="tl-item">
+          <div class="tl-line">
+            <div class="tl-dot {% if av %}done{% else %}pending{% endif %}"></div>
+            {% if not forloop.last %}
+            <div class="tl-connector {% if av %}done{% else %}pending{% endif %}"></div>
+            {% endif %}
+          </div>
+          <div>
+            <div class="tl-label {% if av %}done{% else %}pending{% endif %}">
+              {{ etapa_label }}
+            </div>
+            {% if av %}
+            <div class="tl-meta">
+              {{ av.fecha_hora|date:"d/m/Y H:i" }}
+            </div>
+            {% else %}
+            <div class="tl-meta">Pendiente</div>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="text-align:center;color:#475569;padding:16px 0;font-size:.83rem;">
+        Sin avances registrados aún.
+      </div>
+      {% endif %}
+    </div>
+
+    {% if solicitud.estado == 'finalizado' %}
+    <!-- AVISO LISTO -->
+    <div style="background:rgba(61,214,140,.08);border:1px solid rgba(61,214,140,.25);
+      border-radius:14px;padding:20px 24px;text-align:center;">
+      <i class="bi bi-check-circle-fill" style="font-size:1.8rem;color:#3dd68c;display:block;margin-bottom:10px;"></i>
+      <div style="font-size:.95rem;font-weight:600;color:#3dd68c;margin-bottom:6px;">
+        ¡Tu equipo está listo!
+      </div>
+      <div style="font-size:.82rem;color:#94a3b8;">
+        Puedes pasar a recogerlo al taller. Recuerda traer tu comprobante.
+      </div>
+    </div>
+    {% endif %}
+
+  {% endif %}
+
+  </div>
+
+  <div class="footer">
+    <div>TechRepair — Servicio técnico especializado</div>
+    <div style="margin-top:4px;">Para consultas, comunícate directamente con el taller.</div>
+  </div>
+
+</body>
+</html>

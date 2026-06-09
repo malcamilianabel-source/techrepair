@@ -121,6 +121,8 @@ def consultar_clientes(request):
         clientes = clientes.filter(
             nombre__icontains=query
         ) | clientes.filter(
+            apellido__icontains=query
+        ) | clientes.filter(
             dni__icontains=query
         ) | clientes.filter(
             telefono__icontains=query
@@ -225,8 +227,47 @@ def registrar_equipo(request):
     })
 
 
+# ── HORARIO LABORAL ────────────────────────────────────────────
+HORA_INICIO = 9   # 9am
+HORA_FIN    = 22  # 10pm
+
+def calcular_fecha_libre_laboral(now, total_horas):
+    """Distribuye total_horas dentro del horario 9am-10pm."""
+    import datetime as dt_mod
+    hora_actual = now.hour + now.minute / 60
+
+    if hora_actual < HORA_INICIO:
+        inicio = now.replace(hour=HORA_INICIO, minute=0, second=0, microsecond=0)
+    elif hora_actual >= HORA_FIN:
+        inicio = dt_mod.datetime.combine(
+            now.date() + dt_mod.timedelta(days=1),
+            dt_mod.time(HORA_INICIO, 0)
+        )
+    else:
+        inicio = now
+
+    current        = inicio
+    horas_restantes = total_horas
+
+    while horas_restantes > 0:
+        fin_dia   = current.replace(hour=HORA_FIN, minute=0, second=0, microsecond=0)
+        horas_hoy = (fin_dia - current).total_seconds() / 3600
+
+        if horas_restantes <= horas_hoy:
+            current = current + dt_mod.timedelta(hours=horas_restantes)
+            break
+        else:
+            horas_restantes -= horas_hoy
+            current = dt_mod.datetime.combine(
+                current.date() + dt_mod.timedelta(days=1),
+                dt_mod.time(HORA_INICIO, 0)
+            )
+
+    return current
+
+
 # ── MOTOR DE ESTIMACIÓN DE TIEMPO ─────────────────────────────
-def calcular_tiempo_estimado(tipo, prioridad, fecha_ingreso):
+def calcular_tiempo_estimado(tipo, estado_fisico, fecha_ingreso):
     import math
     tiempos_base = {
         'revision':   1,
@@ -235,14 +276,13 @@ def calcular_tiempo_estimado(tipo, prioridad, fecha_ingreso):
         'hardware':   6,
     }
     multiplicadores = {
-        'alta':  0.75,
-        'media': 1.0,
-        'baja':  1.5,
+        'bueno':   1.0,
+        'regular': 1.25,
+        'malo':    1.5,
     }
     base = tiempos_base.get(tipo, 3)
-    mult = multiplicadores.get(prioridad, 1.0)
-    horas = base * mult  
-
+    mult = multiplicadores.get(estado_fisico, 1.25)
+    horas = base * mult
 
     if horas < 1:
         minutos = round(horas * 60)
@@ -254,11 +294,12 @@ def calcular_tiempo_estimado(tipo, prioridad, fecha_ingreso):
         minutos = round((horas - horas_int) * 60)
         tiempo_texto = f"{horas_int}h {minutos}min"
 
-    
-    fecha_estimada = datetime.datetime.combine(fecha_ingreso, datetime.time(8, 0))
-    fecha_estimada = fecha_estimada + datetime.timedelta(hours=horas)
-    dias_estimados = math.ceil(horas / 8)  
-    return dias_estimados, fecha_estimada.date(), tiempo_texto
+    import datetime as dt_mod
+    inicio = dt_mod.datetime.combine(fecha_ingreso, dt_mod.time(HORA_INICIO, 0))
+    fecha_estimada = calcular_fecha_libre_laboral(inicio, horas)
+    dias_estimados = math.ceil(horas / 8)
+
+    return dias_estimados, fecha_estimada.date(), tiempo_texto, horas
 
 
 # ── REGISTRAR SOLICITUD ────────────────────────────────────────
@@ -310,14 +351,15 @@ def registrar_solicitud(request):
                     'cliente_fijo': cliente_fijo,
                     'equipo_fijo':  equipo_fijo,
                 })
-            dias, fecha_est, tiempo_texto = calcular_tiempo_estimado(
-                solicitud.tipo_reparacion,
-                solicitud.prioridad,
-                datetime.date.today()
+            dias, fecha_est, tiempo_texto, horas_est = calcular_tiempo_estimado(
+                 solicitud.tipo_reparacion,
+                 solicitud.equipo.estado,
+                 datetime.date.today()
             )
             solicitud.dias_estimados        = dias
             solicitud.fecha_estimada        = fecha_est
             solicitud.tiempo_estimado_texto = tiempo_texto
+            solicitud.tiempo_estimado_horas = horas_est
             solicitud.save()
             HistorialEstado.objects.create(
                 solicitud    = solicitud,
@@ -385,24 +427,74 @@ def detalle_solicitud(request, pk):
         'cliente', 'equipo', 'detalle__tecnico'
     ).get(pk=pk)
     historial = solicitud.historial.select_related('usuario').all()
+    avances   = solicitud.avances.select_related('usuario').all()
+
+    ETAPA_ORDEN = ['diagnostico', 'desmontaje', 'reparacion', 'prueba', 'ensamblaje', 'prueba_final']
+    ETAPA_LABELS = dict(Avance.ETAPAS)
+    avances_dict    = {av.etapa: av for av in avances}
+    progreso_etapas = [(k, ETAPA_LABELS.get(k, k), avances_dict.get(k)) for k in ETAPA_ORDEN]
+    bitacora_completa = all(avances_dict.get(k) for k in ETAPA_ORDEN)
+    seguimiento_url   = request.build_absolute_uri(f'/seguimiento/{solicitud.pk}/')
+
     return render(request, 'core/solicitudes/detalle.html', {
-        'solicitud': solicitud,
-        'historial': historial,
+        'solicitud':         solicitud,
+        'historial':         historial,
+        'progreso_etapas':   progreso_etapas,
+        'bitacora_completa': bitacora_completa,
+        'seguimiento_url':   seguimiento_url,
     })
 
 
 # ── CAMBIAR ESTADO ─────────────────────────────────────────────
 @login_required(login_url='login')
 def cambiar_estado(request, pk):
+    if request.user.rol not in ['admin', 'tec']:
+        return redirect('detalle_solicitud', pk=pk)
     solicitud = Solicitud.objects.get(pk=pk)
+
+    ESTADO_ORDEN = ['pendiente', 'proceso', 'finalizado', 'entregado']
+    ESTADO_LABELS = {
+        'pendiente':  'Pendiente',
+        'proceso':    'En proceso',
+        'finalizado': 'Finalizado',
+        'entregado':  'Entregado',
+    }
+    idx_actual = ESTADO_ORDEN.index(solicitud.estado) if solicitud.estado in ESTADO_ORDEN else 0
+    estados_siguientes = ESTADO_ORDEN[idx_actual + 1:]
+    if request.user.rol == 'tec':
+        estados_siguientes = [e for e in estados_siguientes if e != 'entregado']
+    choices = [(e, ESTADO_LABELS[e]) for e in estados_siguientes]
+
     if request.method == 'POST':
         form = CambiarEstadoForm(request.POST)
+        form.fields['estado'].choices = choices
         if form.is_valid():
-            if request.user.rol == 'tec' and form.cleaned_data['estado'] == 'entregado':
-                messages.error(request, 'Los técnicos no pueden marcar como Entregado.')
+            nuevo_estado = form.cleaned_data['estado']
+            if nuevo_estado not in estados_siguientes:
+                messages.error(request, 'Estado no válido.')
                 return redirect('detalle_solicitud', pk=pk)
-            estado_antes         = solicitud.estado
-            solicitud.estado     = form.cleaned_data['estado']
+
+            # Verificar costo antes de finalizar
+            if nuevo_estado == 'finalizado':
+                tiene_repuestos = solicitud.repuestos.exists()
+                try:
+                    tiene_costo = solicitud.costo.mano_obra > 0
+                except Exception:
+                    tiene_costo = False
+                if not tiene_repuestos and not tiene_costo:
+                    messages.error(
+                        request,
+                        'Debes registrar el costo de reparación antes de finalizar la solicitud.'
+                    )
+                    return render(request, 'core/solicitudes/cambiar_estado.html', {
+                        'form':        form,
+                        'solicitud':   solicitud,
+                        'sin_opciones': False,
+                        'error_costo': True,
+                    })
+
+            estado_antes     = solicitud.estado
+            solicitud.estado = nuevo_estado
             solicitud.save()
             HistorialEstado.objects.create(
                 solicitud    = solicitud,
@@ -414,16 +506,14 @@ def cambiar_estado(request, pk):
             messages.success(request, 'Estado actualizado correctamente.')
             return redirect('detalle_solicitud', pk=pk)
     else:
-        form = CambiarEstadoForm(initial={'estado': solicitud.estado})
-        if request.user.rol == 'tec':
-            form.fields['estado'].choices = [
-                ('pendiente',  'Pendiente'),
-                ('proceso',    'En proceso'),
-                ('finalizado', 'Finalizado'),
-            ]
+        initial = choices[0][0] if choices else solicitud.estado
+        form = CambiarEstadoForm(initial={'estado': initial})
+        form.fields['estado'].choices = choices
+
     return render(request, 'core/solicitudes/cambiar_estado.html', {
-        'form':      form,
-        'solicitud': solicitud,
+        'form':        form,
+        'solicitud':   solicitud,
+        'sin_opciones': not choices,
     })
 
 
@@ -446,7 +536,15 @@ def asignar_tecnico(request, pk):
     }
     esp_ideal = MAPA_TIPO_ESP.get(solicitud.tipo_reparacion, 'general')
     tecnicos  = Usuario.objects.filter(rol='tec')
-    now       = timezone.now()
+    # Si hay técnico actual asignado, excluirlo de la lista de reasignación
+    try:
+        tecnico_actual = solicitud.detalle.tecnico
+        if tecnico_actual:
+            tecnicos = tecnicos.exclude(pk=tecnico_actual.pk)
+    except Exception:
+        tecnico_actual = None
+    import datetime as dt_mod
+    now = dt_mod.datetime.now()
 
     tecnicos_libres   = []
     tecnicos_ocupados = []
@@ -459,34 +557,32 @@ def asignar_tecnico(request, pk):
         if activos == 0:
             tecnicos_libres.append(tec)
         else:
-            proxima_sol = Solicitud.objects.filter(
-                detalle__tecnico=tec,
-                estado__in=['pendiente', 'proceso'],
-                fecha_estimada__isnull=False
-            ).order_by('fecha_estimada').first()
+            import datetime as dt_mod
+            # Sumar todas las horas estimadas de trabajos activos
+            activos_qs = Solicitud.objects.filter(
+                detalle__tecnico=tec, estado__in=['pendiente', 'proceso']
+            )
+            total_horas = sum(
+                float(s.tiempo_estimado_horas or 0) for s in activos_qs
+            )
 
-            fecha_libre     = proxima_sol.fecha_estimada if proxima_sol else None
+            fecha_libre     = None
             tiempo_restante = None
 
-            if fecha_libre:
-                import datetime as dt_mod
-                if isinstance(fecha_libre, dt_mod.date) and not isinstance(fecha_libre, dt_mod.datetime):
-                    from django.utils.timezone import make_aware
-                    fecha_libre = make_aware(dt_mod.datetime.combine(fecha_libre, dt_mod.time(23, 59)))
-                delta         = fecha_libre - now
-                total_seconds = int(delta.total_seconds())
-                if total_seconds > 0:
-                    horas   = total_seconds // 3600
-                    minutos = (total_seconds % 3600) // 60
-                    if horas >= 48:
-                        dias = horas // 24
-                        tiempo_restante = f'{dias} día{"s" if dias != 1 else ""}'
-                    elif horas >= 1:
-                        tiempo_restante = f'{horas}h {minutos}min'
-                    else:
-                        tiempo_restante = f'{minutos} min'
+            if total_horas > 0:
+                fecha_libre   = calcular_fecha_libre_laboral(now, total_horas)
+                total_seconds = int(total_horas * 3600)
+                h = total_seconds // 3600
+                m = (total_seconds % 3600) // 60
+                if h >= 48:
+                    dias = h // 24
+                    tiempo_restante = f'{dias} día{"s" if dias != 1 else ""}'
+                elif h >= 1:
+                    tiempo_restante = f'{h}h {m}min' if m else f'{h}h'
                 else:
-                    tiempo_restante = 'Tiempo vencido'
+                    tiempo_restante = f'{m} min'
+            else:
+                tiempo_restante = 'Sin estimado'
 
             tecnicos_ocupados.append({
                 'tec':             tec,
@@ -514,24 +610,54 @@ def asignar_tecnico(request, pk):
     ).exclude(pk=pk).select_related('cliente', 'equipo').order_by('creado_en')
 
     if request.method == 'POST':
+        # No permitir asignación si la solicitud ya está finalizada o entregada
+        if solicitud.estado in ['finalizado', 'entregado']:
+            messages.error(request, 'No se puede asignar técnico a una solicitud finalizada o entregada.')
+            return redirect('detalle_solicitud', pk=pk)
+
         form = AsignarTecnicoForm(request.POST)
         if form.is_valid():
+            import datetime as dt_mod
             tec_id  = form.cleaned_data['tecnico'].pk
             tec_obj = Usuario.objects.get(pk=tec_id)
-            det     = solicitud.detalle
+            det, _ = DetalleSolicitud.objects.get_or_create(solicitud=solicitud)
             det.tecnico = tec_obj
             det.save()
+
+            # Recalcular fecha_estimada considerando carga actual del técnico
+            horas_actuales = sum(
+                float(s.tiempo_estimado_horas or 0)
+                for s in Solicitud.objects.filter(
+                    detalle__tecnico=tec_obj,
+                    estado__in=['pendiente', 'proceso']
+                ).exclude(pk=solicitud.pk)
+            )
+            inicio = dt_mod.datetime.now()
+            if horas_actuales > 0:
+                inicio = calcular_fecha_libre_laboral(inicio, horas_actuales)
+            nueva_fecha = calcular_fecha_libre_laboral(inicio, float(solicitud.tiempo_estimado_horas or 0))
+            solicitud.fecha_estimada = nueva_fecha.date()
+
+            # Solo avanzar a proceso si estaba pendiente; si ya estaba en proceso, mantener
+            estado_antes = solicitud.estado
+            if solicitud.estado == 'pendiente':
+                solicitud.estado = 'proceso'
+            solicitud.save()
+
             HistorialEstado.objects.create(
                 solicitud=solicitud, usuario=request.user,
-                estado_antes=solicitud.estado, estado_nuevo='proceso',
+                estado_antes=estado_antes, estado_nuevo=solicitud.estado,
                 observacion=f'Técnico asignado: {tec_obj.get_full_name() or tec_obj.username}'
             )
-            solicitud.estado = 'proceso'
-            solicitud.save()
             messages.success(request, f'Técnico {tec_obj.get_full_name() or tec_obj.username} asignado correctamente.')
             return redirect('detalle_solicitud', pk=pk)
     else:
         form = AsignarTecnicoForm()
+
+    # Recomendado entre ocupados: el que se desocupa antes
+    recomendado_ocupado = next(
+        (item for item in tecnicos_ocupados if item['proxima'] is not None), None
+    )
 
     return render(request, 'core/solicitudes/asignar_tecnico.html', {
         'solicitud':             solicitud,
@@ -539,6 +665,7 @@ def asignar_tecnico(request, pk):
         'tecnicos_libres':       tecnicos_libres,
         'tecnicos_ocupados':     tecnicos_ocupados,
         'recomendado':           recomendado,
+        'recomendado_ocupado':   recomendado_ocupado,
         'esp_ideal':             esp_ideal,
         'hay_libres':            len(tecnicos_libres) > 0,
         'lista_espera_clientes': lista_espera_clientes,
@@ -558,6 +685,26 @@ def registrar_usuario(request):
     else:
         form = UsuarioForm()
     return render(request, 'core/usuarios/registrar.html', {'form': form})
+
+# ── CONSULTAR USUARIO ──────────────────────────────────────────
+@login_required(login_url='login')
+def consultar_usuarios(request):
+    if request.user.rol != 'admin':
+        return redirect('dashboard')
+    query    = request.GET.get('q', '')
+    usuarios = Usuario.objects.exclude(pk=request.user.pk).order_by('rol', 'first_name')
+    if query:
+        usuarios = usuarios.filter(
+            first_name__icontains=query
+        ) | usuarios.filter(
+            last_name__icontains=query
+        ) | usuarios.filter(
+            username__icontains=query
+        )
+    return render(request, 'core/usuarios/consultar.html', {
+        'usuarios': usuarios,
+        'query':    query,
+    })
 
     # ── DIAGNÓSTICO ────────────────────────────────────────────────
 @login_required(login_url='login')
@@ -580,12 +727,29 @@ def diagnostico(request, pk):
     # ── AVANCE / BITÁCORA ──────────────────────────────────────────
 @login_required(login_url='login')
 def avance(request, pk):
+    ETAPA_ORDEN = ['diagnostico', 'desmontaje', 'reparacion', 'prueba', 'ensamblaje', 'prueba_final']
+    ETAPA_LABELS = dict(Avance.ETAPAS)
+
     solicitud = Solicitud.objects.get(pk=pk)
     avances   = solicitud.avances.select_related('usuario').all()
+
+    ultimo_avance = avances.last()
+    if ultimo_avance and ultimo_avance.etapa in ETAPA_ORDEN:
+        idx_ultimo = ETAPA_ORDEN.index(ultimo_avance.etapa)
+        etapas_disponibles = ETAPA_ORDEN[idx_ultimo + 1:]
+    else:
+        etapas_disponibles = list(ETAPA_ORDEN)
+
+    choices = [('', '---------')] + [(e, ETAPA_LABELS.get(e, e)) for e in etapas_disponibles]
+
     if request.method == 'POST':
         form = AvanceForm(request.POST)
+        form.fields['etapa'].choices = choices
         if form.is_valid():
-            av          = form.save(commit=False)
+            if form.cleaned_data['etapa'] not in etapas_disponibles:
+                messages.error(request, 'Esa etapa no está disponible.')
+                return redirect('avance', pk=pk)
+            av           = form.save(commit=False)
             av.solicitud = solicitud
             av.usuario   = request.user
             av.save()
@@ -593,10 +757,13 @@ def avance(request, pk):
             return redirect('avance', pk=pk)
     else:
         form = AvanceForm()
+        form.fields['etapa'].choices = choices
+
     return render(request, 'core/solicitudes/avance.html', {
-        'form':      form,
-        'solicitud': solicitud,
-        'avances':   avances,
+        'form':        form,
+        'solicitud':   solicitud,
+        'avances':     avances,
+        'sin_etapas':  not etapas_disponibles,
     })
 
     # ── REPUESTOS ──────────────────────────────────────────────────
@@ -889,6 +1056,29 @@ def equipos_por_cliente(request, cliente_id):
     import datetime
 from django.http import HttpResponse
 
+
+# ── SEGUIMIENTO PÚBLICO ────────────────────────────────────────
+def seguimiento(request, pk):
+    try:
+        solicitud = Solicitud.objects.select_related(
+            'cliente', 'equipo', 'detalle__tecnico'
+        ).get(pk=pk)
+    except Solicitud.DoesNotExist:
+        return render(request, 'core/solicitudes/seguimiento.html', {'no_encontrado': True})
+
+    avances = solicitud.avances.select_related('usuario').all()
+
+    ETAPA_ORDEN = ['diagnostico', 'desmontaje', 'reparacion', 'prueba', 'ensamblaje', 'prueba_final']
+    ETAPA_LABELS = dict(Avance.ETAPAS)
+    avances_dict    = {av.etapa: av for av in avances}
+    progreso_etapas = [(k, ETAPA_LABELS.get(k, k), avances_dict.get(k)) for k in ETAPA_ORDEN]
+
+    return render(request, 'core/solicitudes/seguimiento.html', {
+        'solicitud':       solicitud,
+        'progreso_etapas': progreso_etapas,
+    })
+
+
 # ── ENTREGA DE EQUIPO ──────────────────────────────────────────
 @login_required(login_url='login')
 def entrega(request, pk):
@@ -1130,6 +1320,8 @@ def eliminar_solicitud(request, pk):
     # ── MARCAR COMO PRIORITARIA ────────────────────────────────────
 @login_required(login_url='login')
 def marcar_prioritaria(request, pk):
+    if request.user.rol not in ['admin', 'recep']:
+        return redirect('consultar_solicitudes')
     solicitud = Solicitud.objects.get(pk=pk)
     solicitud.prioridad = 'alta'
     solicitud.save()
@@ -1202,9 +1394,13 @@ def actualizar_equipo(request, pk):
     if request.user.rol == 'tec':
         return redirect('dashboard')
     equipo = Equipo.objects.select_related('cliente').get(pk=pk)
+    CAMPOS_IDENTIDAD = ['tipo', 'tipo_personalizado', 'marca', 'marca_personalizada', 'modelo', 'serie']
     if request.method == 'POST':
         form = EquipoUpdateForm(request.POST, instance=equipo)
         if form.is_valid():
+            if request.user.rol != 'admin':
+                for campo in CAMPOS_IDENTIDAD:
+                    form.cleaned_data[campo] = getattr(equipo, campo)
             form.save()
             messages.success(request, 'Equipo actualizado correctamente.')
             return redirect('consultar_equipos')

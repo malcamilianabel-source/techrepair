@@ -182,6 +182,16 @@ document.addEventListener('DOMContentLoaded',()=>{
 
 <div class="card" style="margin-top:1rem;">
   <div class="ct">&#9888; Asignar de todas formas</div>
+  {% if recomendado_ocupado %}
+  <div style="background:var(--ag);border:1px solid rgba(91,141,238,.3);border-radius:var(--rs);
+              padding:10px 14px;margin-bottom:14px;font-size:.82rem;display:flex;align-items:center;gap:8px;">
+    <i class="bi bi-star-fill" style="color:var(--accent);"></i>
+    <span style="color:var(--t2);">Recomendado:</span>
+    <strong style="color:var(--accent);">{{ recomendado_ocupado.tec.get_full_name|default:recomendado_ocupado.tec.username }}</strong>
+    <span style="color:var(--t3);">— se desocupa en {{ recomendado_ocupado.tiempo_restante }}
+      ({{ recomendado_ocupado.proxima|date:"d/m/Y H:i" }})</span>
+  </div>
+  {% endif %}
   <form method="post" style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
     {% csrf_token %}
     {{ form.tecnico }}
@@ -190,8 +200,10 @@ document.addEventListener('DOMContentLoaded',()=>{
       <select name="tecnico_forzado" id="sel_forzado" class="fc"
               onchange="document.getElementById('id_tecnico').value=this.value">
         {% for item in tecnicos_ocupados %}
-          <option value="{{ item.tec.pk }}">
+          <option value="{{ item.tec.pk }}"
+            {% if recomendado_ocupado and item.tec.pk == recomendado_ocupado.tec.pk %}selected{% endif %}>
             {{ item.tec.get_full_name|default:item.tec.username }} ({{ item.activos }} activo{{ item.activos|pluralize }})
+            {% if recomendado_ocupado and item.tec.pk == recomendado_ocupado.tec.pk %}★{% endif %}
           </option>
         {% endfor %}
       </select>

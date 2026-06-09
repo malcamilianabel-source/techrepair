@@ -68,6 +68,32 @@
     </div>
   </div>
 
+  {% if error_costo %}
+  <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);
+    color:#f87171;padding:14px 16px;border-radius:var(--rs);
+    font-size:.85rem;display:flex;align-items:flex-start;gap:10px;margin-bottom:16px;">
+    <i class="bi bi-exclamation-circle-fill" style="font-size:1rem;margin-top:1px;flex-shrink:0;"></i>
+    <div>
+      <strong>No se puede finalizar sin costo registrado.</strong><br>
+      <span style="color:var(--t2);">Debes ingresar la mano de obra o los repuestos utilizados antes de marcar como Finalizado.</span><br>
+      <a href="{% url 'costos' solicitud.pk %}" class="btn btn-p btn-sm" style="margin-top:10px;display:inline-flex;">
+        <i class="bi bi-currency-dollar"></i> Ir a Costos
+      </a>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if sin_opciones %}
+  <div style="background:var(--wg);border:1px solid rgba(245,166,35,.3);
+    color:var(--warn);padding:14px;border-radius:var(--rs);
+    font-size:.85rem;display:flex;align-items:center;gap:8px;margin-bottom:16px;">
+    <i class="bi bi-lock-fill"></i>
+    Esta solicitud ya está en su estado final y no puede avanzar más.
+  </div>
+  <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-o">
+    <i class="bi bi-arrow-left"></i> Volver
+  </a>
+  {% else %}
   <form method="POST">
     {% csrf_token %}
     <div style="display:flex;flex-direction:column;gap:14px;">
@@ -101,5 +127,6 @@
       </a>
     </div>
   </form>
+  {% endif %}
 </div>
 {% endblock %}

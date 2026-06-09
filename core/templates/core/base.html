@@ -145,6 +145,9 @@ textarea.fc{resize:vertical;min-height:80px;}
   <a href="{% url 'registrar_usuario' %}" class="sb-item {% if request.resolver_match.url_name == 'registrar_usuario' %}on{% endif %}">
     <i class="bi bi-person-plus-fill"></i> Registrar Usuario
   </a>
+  <a href="{% url 'consultar_usuarios' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_usuarios' %}on{% endif %}">
+    <i class="bi bi-people"></i> Consultar Usuarios
+  </a>
   <div class="sb-sect">Clientes</div>
   <a href="{% url 'registrar_cliente' %}" class="sb-item {% if request.resolver_match.url_name == 'registrar_cliente' %}on{% endif %}">
     <i class="bi bi-person-badge-fill"></i> Registrar Cliente
@@ -231,10 +234,6 @@ textarea.fc{resize:vertical;min-height:80px;}
   <div class="sb-sect">Mis Trabajos</div>
   <a href="{% url 'consultar_solicitudes' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_solicitudes' %}on{% endif %}">
     <i class="bi bi-kanban-fill"></i> Mis Solicitudes
-  </a>
-  <div class="sb-sect">Equipos</div>
-  <a href="{% url 'consultar_equipos' %}" class="sb-item {% if request.resolver_match.url_name == 'consultar_equipos' %}on{% endif %}">
-    <i class="bi bi-search"></i> Consultar Equipos
   </a>
 {% endif %}
 

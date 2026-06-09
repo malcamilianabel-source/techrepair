@@ -25,11 +25,20 @@
     {% csrf_token %}
     <div class="grid2">
       <div class="fg">
-        <label class="fl">Nombre completo</label>
+        <label class="fl">Nombres</label>
         {{ form.nombre }}
         {% if form.nombre.errors %}
         <span style="color:var(--danger);font-size:.72rem;">
           {{ form.nombre.errors|join:", " }}
+        </span>
+        {% endif %}
+      </div>
+      <div class="fg">
+        <label class="fl">Apellidos</label>
+        {{ form.apellido }}
+        {% if form.apellido.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">
+          {{ form.apellido.errors|join:", " }}
         </span>
         {% endif %}
       </div>

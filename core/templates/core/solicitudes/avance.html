@@ -19,6 +19,17 @@
   <!-- FORMULARIO -->
   <div class="card">
     <div class="ct">Registrar nuevo avance</div>
+    {% if sin_etapas %}
+    <div style="background:var(--sg);border:1px solid rgba(61,214,140,.3);
+      color:var(--success);padding:12px 14px;border-radius:var(--rs);
+      font-size:.83rem;display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+      <i class="bi bi-check-circle-fill"></i>
+      Todas las etapas han sido completadas.
+    </div>
+    <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-o">
+      <i class="bi bi-arrow-left"></i> Volver
+    </a>
+    {% else %}
     <form method="POST">
       {% csrf_token %}
       <div style="display:flex;flex-direction:column;gap:14px;">
@@ -48,6 +59,7 @@
         </a>
       </div>
     </form>
+    {% endif %}
   </div>
 
   <!-- BITÁCORA -->

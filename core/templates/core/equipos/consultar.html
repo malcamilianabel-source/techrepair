@@ -81,12 +81,11 @@
               <span class="badge bl">Bueno</span>
             {% endif %}
           </td>
-          <td>{{ equipo.cliente.nombre }}</td>
+          <td>{{ equipo.cliente.nombre }} {{ equipo.cliente.apellido }}</td>
           <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
             {{ equipo.falla|default:"—" }}
           </td>
-          <td>                             
-    <td style="display:flex;gap:6px;">
+          <td style="display:flex;gap:6px;">
             <a href="{% url 'actualizar_equipo' equipo.pk %}"
               class="btn btn-o btn-sm" title="Editar equipo">
               <i class="bi bi-pencil"></i>
@@ -104,7 +103,6 @@
             </a>
             {% endif %}
           </td>
-  </td>
         </tr>
         {% empty %}
         <tr>

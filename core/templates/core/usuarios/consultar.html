@@ -1,0 +1,103 @@
+{% extends 'core/base.html' %}
+{% block title %}Consultar Usuarios{% endblock %}
+
+{% block content %}
+<div class="bc">Inicio / Usuarios / <span>Consultar Usuarios</span></div>
+<div style="margin-bottom:20px;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
+      <i class="bi bi-people-fill"></i>
+    </div>
+    Usuarios del Sistema
+  </div>
+  <div class="ps">Técnicos, recepcionistas y administradores registrados</div>
+</div>
+
+{% if messages %}
+  {% for msg in messages %}
+  <div style="background:var(--sg);border:1px solid rgba(61,214,140,.3);color:var(--success);
+    padding:10px 14px;border-radius:var(--rs);font-size:.82rem;
+    display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+    <i class="bi bi-check-circle-fill"></i> {{ msg }}
+  </div>
+  {% endfor %}
+{% endif %}
+
+<!-- BUSCADOR -->
+<form method="GET" style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
+  <div style="position:relative;flex:1;max-width:360px;">
+    <i class="bi bi-search" style="position:absolute;left:10px;top:50%;
+      transform:translateY(-50%);color:var(--t3);font-size:.85rem;"></i>
+    <input class="fc" type="text" name="q" value="{{ query }}"
+      placeholder="Buscar por nombre o usuario..."
+      style="padding-left:32px;">
+  </div>
+  <button class="btn btn-p btn-sm" type="submit">
+    <i class="bi bi-search"></i> Buscar
+  </button>
+  <a href="{% url 'registrar_usuario' %}" class="btn btn-p" style="margin-left:auto;">
+    <i class="bi bi-person-plus-fill"></i> Nuevo Usuario
+  </a>
+</form>
+
+<!-- TABLA -->
+<div class="card">
+  <div class="tw">
+    <table>
+      <thead>
+        <tr>
+          <th>Usuario</th>
+          <th>Nombre completo</th>
+          <th>Correo</th>
+          <th style="text-align:center;">Rol</th>
+          <th style="text-align:center;">Especialidad</th>
+          <th style="text-align:center;">Estado</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in usuarios %}
+        <tr>
+          <td>
+            <span class="mono acc" style="font-weight:600;">@{{ u.username }}</span>
+          </td>
+          <td><strong>{{ u.get_full_name|default:"—" }}</strong></td>
+          <td style="color:var(--t2);font-size:.82rem;">{{ u.email|default:"—" }}</td>
+          <td style="text-align:center;">
+            {% if u.rol == 'admin' %}
+              <span class="badge bh">Admin</span>
+            {% elif u.rol == 'tec' %}
+              <span class="badge bm">Técnico</span>
+            {% elif u.rol == 'recep' %}
+              <span class="badge bl">Recepcionista</span>
+            {% else %}
+              <span style="color:var(--t3);">—</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center;color:var(--t2);font-size:.82rem;">
+            {{ u.get_especialidad_display|default:"—" }}
+          </td>
+          <td style="text-align:center;">
+            {% if u.is_active %}
+              <span style="color:var(--success);font-size:.8rem;">&#9679; Activo</span>
+            {% else %}
+              <span style="color:var(--danger);font-size:.8rem;">&#9679; Inactivo</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="6" style="text-align:center;padding:30px;color:var(--t3);">
+            <i class="bi bi-person-slash" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
+            {% if query %}
+              No se encontraron usuarios con "{{ query }}"
+            {% else %}
+              No hay usuarios registrados aún.
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

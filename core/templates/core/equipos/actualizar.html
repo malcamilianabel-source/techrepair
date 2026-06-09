@@ -26,7 +26,8 @@
     {% csrf_token %}
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;">
 
-      <!-- Tipo -->
+      {% if request.user.rol == 'admin' %}
+      <!-- Tipo — solo admin -->
       <div class="fg">
         <label class="fl">Tipo de equipo <span style="color:var(--danger);">*</span></label>
         {{ form.tipo }}
@@ -38,7 +39,7 @@
         {% if form.tipo_personalizado.errors %}<span style="color:var(--danger);font-size:.72rem;">{{ form.tipo_personalizado.errors|join:", " }}</span>{% endif %}
       </div>
 
-      <!-- Marca -->
+      <!-- Marca — solo admin -->
       <div class="fg">
         <label class="fl">Marca <span style="color:var(--danger);">*</span></label>
         {{ form.marca }}
@@ -50,22 +51,41 @@
         {% if form.marca_personalizada.errors %}<span style="color:var(--danger);font-size:.72rem;">{{ form.marca_personalizada.errors|join:", " }}</span>{% endif %}
       </div>
 
-      <!-- Modelo -->
+      <!-- Modelo — solo admin -->
       <div class="fg">
         <label class="fl">Modelo <span style="color:var(--danger);">*</span></label>
         {{ form.modelo }}
         {% if form.modelo.errors %}<span style="color:var(--danger);font-size:.72rem;">{{ form.modelo.errors|join:", " }}</span>{% endif %}
       </div>
 
-      <!-- Serie -->
+      <!-- Serie — solo admin -->
       <div class="fg">
         <label class="fl">Número de serie <span style="color:var(--danger);">*</span></label>
         {{ form.serie }}
         <span style="font-size:.7rem;color:var(--t3);">Se verifica duplicados</span>
         {% if form.serie.errors %}<span style="color:var(--danger);font-size:.72rem;">{{ form.serie.errors|join:", " }}</span>{% endif %}
       </div>
+      {% else %}
+      <!-- Campos de identidad — solo lectura para recep -->
+      <div class="fg">
+        <label class="fl">Tipo de equipo <small style="color:var(--t3);">(no editable)</small></label>
+        <input class="fc" value="{{ equipo.get_tipo_display }}" disabled style="opacity:.4;cursor:not-allowed;">
+      </div>
+      <div class="fg">
+        <label class="fl">Marca <small style="color:var(--t3);">(no editable)</small></label>
+        <input class="fc" value="{{ equipo.get_marca_display }}" disabled style="opacity:.4;cursor:not-allowed;">
+      </div>
+      <div class="fg">
+        <label class="fl">Modelo <small style="color:var(--t3);">(no editable)</small></label>
+        <input class="fc" value="{{ equipo.modelo }}" disabled style="opacity:.4;cursor:not-allowed;">
+      </div>
+      <div class="fg">
+        <label class="fl">Número de serie <small style="color:var(--t3);">(no editable)</small></label>
+        <input class="fc" value="{{ equipo.serie }}" disabled style="opacity:.4;cursor:not-allowed;">
+      </div>
+      {% endif %}
 
-      <!-- Estado -->
+      <!-- Estado — editable por todos -->
       <div class="fg">
         <label class="fl">Estado físico</label>
         {{ form.estado }}
@@ -79,7 +99,7 @@
           disabled style="opacity:.4;cursor:not-allowed;">
       </div>
 
-      <!-- Falla -->
+      <!-- Falla — editable por todos -->
       <div class="fg" style="grid-column:span 3;">
         <label class="fl">Falla reportada</label>
         {{ form.falla }}

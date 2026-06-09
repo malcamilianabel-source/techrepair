@@ -33,6 +33,12 @@ class ClienteForm(forms.ModelForm):
             'correo':    'Correo electrónico',
         }
 
+    def clean_nombre(self):
+        return self.cleaned_data.get('nombre', '').strip().title()
+
+    def clean_apellido(self):
+        return self.cleaned_data.get('apellido', '').strip().title()
+
     def clean_dni(self):
         dni = self.cleaned_data.get('dni', '')
         if not dni.isdigit():
@@ -191,13 +197,31 @@ class UsuarioForm(forms.ModelForm):
         fields = ['username', 'first_name', 'last_name', 'email',
                   'password', 'rol', 'especialidad', 'especialidad_otro']
         widgets = {
-            'username':   forms.TextInput(attrs={'class': 'fc'}),
-            'first_name': forms.TextInput(attrs={'class': 'fc'}),
-            'last_name':  forms.TextInput(attrs={'class': 'fc'}),
-            'email':      forms.EmailInput(attrs={'class': 'fc'}),
-            'rol':        forms.Select(attrs={'class': 'fc'}),
+            'username':     forms.TextInput(attrs={'class': 'fc'}),
+            'first_name':   forms.TextInput(attrs={'class': 'fc'}),
+            'last_name':    forms.TextInput(attrs={'class': 'fc'}),
+            'email':        forms.EmailInput(attrs={'class': 'fc'}),
+            'rol':          forms.Select(attrs={'class': 'fc'}),
             'especialidad': forms.Select(attrs={'class': 'fc', 'id': 'id_especialidad'}),
         }
+
+    def clean_first_name(self):
+        valor = self.cleaned_data.get('first_name', '').strip()
+        if any(c.isdigit() for c in valor):
+            raise forms.ValidationError('El nombre no puede contener números.')
+        return valor.title()
+
+    def clean_last_name(self):
+        valor = self.cleaned_data.get('last_name', '').strip()
+        if any(c.isdigit() for c in valor):
+            raise forms.ValidationError('El apellido no puede contener números.')
+        return valor.title()
+
+    def clean_username(self):
+        valor = self.cleaned_data.get('username', '').strip()
+        if any(c.isdigit() for c in valor):
+            raise forms.ValidationError('El usuario no puede contener números.')
+        return valor
 
     def save(self, commit=True):
         user = super().save(commit=False)

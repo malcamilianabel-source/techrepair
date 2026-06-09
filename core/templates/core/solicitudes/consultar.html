@@ -107,13 +107,19 @@
             {% endif %}
           </td>
           <td class="mono">
-               {% if sol.tiempo_estimado_texto %}
-             <span style="color:var(--accent);">{{ sol.tiempo_estimado_texto }}</span>
-              {% else %}—{% endif %}
-           </td>
+            {% if sol.estado == 'finalizado' %}
+              <span style="color:var(--success);">Finalizado</span>
+            {% elif sol.estado == 'entregado' %}
+              <span style="color:var(--success);">Entregado</span>
+            {% elif sol.tiempo_estimado_texto and sol.detalle.tecnico %}
+              <span style="color:var(--accent);">{{ sol.tiempo_estimado_texto }}</span>
+            {% else %}
+              <span style="color:var(--t3);">Por definirse</span>
+            {% endif %}
+          </td>
           <td style="display:flex;gap:4px;">
             {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
-{% if sol.prioridad != 'alta' %}
+{% if sol.estado != 'finalizado' and sol.estado != 'entregado' and sol.prioridad != 'alta' %}
 <a href="{% url 'marcar_prioritaria' sol.pk %}"
   onclick="return confirm('¿Marcar esta solicitud como prioritaria?')"
   class="btn btn-o btn-sm" title="Marcar prioritaria"
@@ -127,16 +133,27 @@
     <i class="bi bi-eye"></i>
   </a>
   {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
+  {% if sol.estado != 'finalizado' and sol.estado != 'entregado' %}
+  {% if sol.detalle.tecnico %}
+  <a href="{% url 'asignar_tecnico' sol.pk %}"
+    class="btn btn-o btn-sm" title="Reasignar técnico" style="color:var(--warn);">
+    <i class="bi bi-person-fill-gear"></i>
+  </a>
+  {% else %}
   <a href="{% url 'asignar_tecnico' sol.pk %}"
     class="btn btn-o btn-sm" title="Asignar técnico">
     <i class="bi bi-person-check"></i>
   </a>
   {% endif %}
+  {% endif %}
+  {% endif %}
   {% if request.user.rol == 'admin' or request.user.rol == 'tec' %}
+  {% if sol.estado != 'finalizado' and sol.estado != 'entregado' %}
   <a href="{% url 'cambiar_estado' sol.pk %}"
     class="btn btn-o btn-sm" title="Cambiar estado">
     <i class="bi bi-arrow-repeat"></i>
   </a>
+  {% endif %}
   {% endif %}
 </td>
         {% empty %}

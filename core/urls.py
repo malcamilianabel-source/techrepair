@@ -43,12 +43,16 @@ urlpatterns = [
 
     # ── USUARIOS ──
     path('usuarios/registrar/', views.registrar_usuario, name='registrar_usuario'),
+    path('usuarios/consultar/', views.consultar_usuarios, name='consultar_usuarios'),
 
     # ── REPORTES ──
     path('reportes/', views.reportes, name='reportes'),
     path('reportes/solicitudes/', views.reporte_solicitudes, name='reporte_solicitudes'),
     path('reportes/tiempos/', views.reporte_tiempos, name='reporte_tiempos'),
     path('reportes/ingresos/', views.reporte_ingresos, name='reporte_ingresos'),
+
+    # ── SEGUIMIENTO PÚBLICO ──
+    path('seguimiento/<int:pk>/', views.seguimiento, name='seguimiento'),
 
     # ── AJAX ──
     path('api/equipos/<int:cliente_id>/', views.equipos_por_cliente, name='equipos_por_cliente'),

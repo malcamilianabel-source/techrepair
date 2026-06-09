@@ -105,7 +105,9 @@
             {% else %}<span class="badge">{{ sol.get_estado_display }}</span>{% endif %}
           </td>
           <td class="mono">
-            {% if sol.tiempo_estimado_texto %}
+            {% if sol.estado == 'finalizado' or sol.estado == 'entregado' %}
+              <span style="color:var(--success);">Finalizado</span>
+            {% elif sol.tiempo_estimado_texto %}
               <span style="color:var(--accent);">{{ sol.tiempo_estimado_texto }}</span>
             {% else %}—{% endif %}
           </td>
@@ -255,7 +257,7 @@
           {% elif sol.estado == 'finalizado' %}<span class="badge bf">Finalizado</span>
           {% elif sol.estado == 'entregado' %}<span class="badge" style="background:var(--tg);color:var(--teal);">Entregado</span>
           {% endif %}
-          {% if sol.tiempo_estimado_texto %}
+          {% if sol.estado != 'finalizado' and sol.estado != 'entregado' and sol.tiempo_estimado_texto %}
           <div style="font-size:.7rem;color:var(--t3);margin-top:2px;">
             {{ sol.tiempo_estimado_texto }}
           </div>

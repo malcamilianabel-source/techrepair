@@ -56,7 +56,7 @@ class Equipo(models.Model):
         ('monitor',    'Monitor'),
         ('otro',       'Otro'),
     ]
-    ESTADOS = [
+    ESTADO_FISICO = [
         ('bueno',   'Bueno'),
         ('regular', 'Regular'),
         ('malo',    'Malo'),
@@ -79,10 +79,10 @@ class Equipo(models.Model):
     ('canon',   'Canon'),
     ('otro',    'Otra'),
     ]
-    marca = models.CharField(max_length=20, choices=MARCAS)
+    marca      = models.CharField(max_length=20, choices=MARCAS)
     modelo     = models.CharField(max_length=100)
     serie      = models.CharField(max_length=100, unique=True)
-    estado     = models.CharField(max_length=10, choices=ESTADOS,
+    estado     = models.CharField(max_length=10, choices=ESTADO_FISICO,
                                    default='regular')
     falla      = models.TextField(blank=True)
     tipo_personalizado  = models.CharField(max_length=100, blank=True, default='')
@@ -90,7 +90,7 @@ class Equipo(models.Model):
     creado_en  = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.marca} {self.modelo} — {self.cliente.nombre}"
+        return f"{self.get_tipo_display()} | {self.marca} {self.modelo} — {self.cliente.nombre}"
 
 
 # ── MODELO 4: SOLICITUD ────────────────────────────────────────
