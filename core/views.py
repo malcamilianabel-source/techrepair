@@ -10,6 +10,7 @@ from .forms import (ClienteForm, EquipoForm, EquipoUpdateForm, SolicitudForm,
                     CambiarEstadoForm, AsignarTecnicoForm, UsuarioForm,
                     DiagnosticoForm, AvanceForm, AmpliacionTiempoForm)
 
+# deploy test
 
 # ── LOGIN ──────────────────────────────────────────────────────
 def login_view(request):
