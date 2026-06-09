@@ -1,178 +1,215 @@
 {% extends 'core/base.html' %}
 {% block title %}Asignar Técnico{% endblock %}
-{% block content %}
-<div class="bc">Inicio / <a href="{% url 'detalle_solicitud' solicitud.pk %}">Solicitud #S-{{ solicitud.id }}</a> / <span>Asignar Técnico</span></div>
 
-<div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
-  <div>
-    <div class="pt">
-      <div class="pt-ic" style="background:rgba(46,116,181,.15);color:#2E74B5;">
-        <i class="bi bi-person-badge-fill"></i>
-      </div>
-      Asignar Técnico
+{% block content %}
+<div class="view">
+
+<div class="bc">Inicio / Solicitudes / <span>Asignar Técnico</span></div>
+<div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; flex-wrap:wrap; gap:.8rem;">
+  <div class="pt">
+    <div class="pt-ic" style="background:var(--ag);">
+      <i class="bi bi-person-gear acc"></i>
     </div>
-    <div class="ps">Solicitud #S-{{ solicitud.id }} — {{ solicitud.get_tipo_reparacion_display }} — {{ solicitud.cliente.nombre_completo }}</div>
+    Asignar Técnico
   </div>
-  <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-o btn-sm">
-    <i class="bi bi-arrow-left"></i> Volver
-  </a>
+  <a href="{% url 'detalle_solicitud' solicitud.pk %}" class="btn btn-o">&larr; Volver</a>
 </div>
+<p class="ps">Solicitud #S-{{ solicitud.pk }} &mdash; {{ solicitud.get_tipo_reparacion_display }} &mdash; {{ solicitud.cliente }}</p>
+
+{% if messages %}
+  {% for msg in messages %}
+    <div class="alert alert-{{ msg.tags }}" style="margin-bottom:1rem;">{{ msg }}</div>
+  {% endfor %}
+{% endif %}
 
 {% if hay_libres %}
-
 <!-- TÉCNICOS DISPONIBLES -->
-<div style="margin-bottom:8px;display:flex;align-items:center;gap:8px;">
-  <i class="bi bi-check-circle-fill" style="color:var(--success);"></i>
-  <strong style="color:var(--t1);">Técnicos disponibles</strong>
-  <span style="font-size:.75rem;color:var(--t3);">— Elige uno o acepta la recomendación del sistema</span>
-</div>
-
-<form method="POST">
+<form method="post">
   {% csrf_token %}
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-bottom:20px;">
+  {{ form.tecnico }}
+  <div style="display:grid; gap:1rem; grid-template-columns:repeat(auto-fill,minmax(240px,1fr)); margin-bottom:1.5rem;">
     {% for tec in tecnicos_libres %}
-    <label for="tec_{{ tec.pk }}" style="cursor:pointer;">
-      <div class="card tec-card {% if tec == recomendado %}recomendado{% endif %}"
-           style="padding:16px;border:2px solid {% if tec == recomendado %}var(--accent){% else %}var(--border){% endif %};
-                  transition:border-color .15s;position:relative;">
-
-        {% if tec == recomendado %}
-        <div style="position:absolute;top:10px;right:10px;
-             background:var(--accent);color:#000;font-size:.65rem;
-             font-weight:700;padding:2px 8px;border-radius:20px;letter-spacing:.04em;">
-          RECOMENDADO
-        </div>
-        {% endif %}
-
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <div style="width:38px;height:38px;border-radius:50%;
-               background:rgba(0,201,167,.15);color:var(--accent);
-               display:flex;align-items:center;justify-content:center;font-size:1.1rem;">
-            <i class="bi bi-person-fill"></i>
-          </div>
-          <div>
-            <div style="font-weight:700;color:var(--t1);">{{ tec.get_full_name|default:tec.username }}</div>
-            <div style="font-size:.72rem;color:var(--t3);">@{{ tec.username }}</div>
-          </div>
-        </div>
-
-        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;">
-          <span style="font-size:.7rem;padding:2px 8px;border-radius:20px;
-                background:rgba(0,131,106,.12);color:#00836A;border:1px solid rgba(0,131,106,.25);">
-            <i class="bi bi-tools"></i>
-            {{ tec.get_especialidad_display }}
-            {% if tec.especialidad == 'otro' and tec.especialidad_otro %}
-              — {{ tec.especialidad_otro }}
-            {% endif %}
-          </span>
-          {% if tec.especialidad == esp_ideal %}
-          <span style="font-size:.7rem;padding:2px 8px;border-radius:20px;
-                background:rgba(0,201,167,.1);color:var(--accent);border:1px solid rgba(0,201,167,.25);">
-            <i class="bi bi-star-fill"></i> Especialidad ideal
-          </span>
-          {% endif %}
-        </div>
-
-        <div style="display:flex;align-items:center;gap:6px;">
-          <input type="radio" name="tecnico" id="tec_{{ tec.pk }}" value="{{ tec.pk }}"
-                 {% if tec == recomendado %}checked{% endif %}
-                 style="accent-color:var(--accent);">
-          <span style="font-size:.8rem;color:var(--t2);">Seleccionar este técnico</span>
-        </div>
+    <label style="cursor:pointer;
+                  border:2px solid {% if tec == recomendado %}var(--success){% else %}var(--border){% endif %};
+                  border-radius:var(--r); padding:1.2rem; position:relative;
+                  background:var(--card); display:block; transition:.12s;">
+      <input type="radio" name="tecnico_sel" value="{{ tec.pk }}"
+             {% if tec == recomendado %}checked{% endif %}
+             onchange="document.getElementById('id_tecnico').value=this.value"
+             style="position:absolute; top:1rem; right:1rem; accent-color:var(--accent);">
+      {% if tec == recomendado %}
+        <span style="background:var(--success); color:#0b0d12; font-size:.63rem; font-weight:700;
+                     padding:.2rem .5rem; border-radius:4px; position:absolute; top:.6rem; left:.6rem;
+                     font-family:'JetBrains Mono',monospace; letter-spacing:.5px;">
+          ★ RECOMENDADO
+        </span><br>
+      {% endif %}
+      <div style="font-weight:600; color:var(--t1); margin-top:{% if tec == recomendado %}1.2rem{% else %}0{% endif %};">
+        {{ tec.get_full_name|default:tec.username }}
       </div>
+      <div style="font-size:.75rem; color:var(--t3); font-family:'JetBrains Mono',monospace;">@{{ tec.username }}</div>
+      <div style="margin-top:.6rem;">
+        <span style="background:var(--ag); color:var(--accent); padding:.2rem .55rem;
+                     border-radius:20px; font-size:.72rem; font-weight:600;">
+          {{ tec.get_especialidad_display }}
+        </span>
+      </div>
+      <div style="margin-top:.5rem; font-size:.78rem; color:var(--success);">&#10003; Disponible ahora</div>
     </label>
     {% endfor %}
   </div>
-
-  <input type="hidden" name="tecnico_id_hidden" value="">
-  <button type="submit" class="btn btn-p">
-    <i class="bi bi-person-check-fill"></i> Confirmar asignación
+  <button type="submit" class="btn btn-p" onclick="syncTecnico()">
+    <i class="bi bi-person-check"></i> Asignar Técnico
   </button>
 </form>
+<script>
+function syncTecnico(){
+  const sel=document.querySelector('input[name="tecnico_sel"]:checked');
+  if(sel) document.getElementById('id_tecnico').value=sel.value;
+}
+document.addEventListener('DOMContentLoaded',()=>{
+  const f=document.querySelector('input[name="tecnico_sel"]:checked')||document.querySelector('input[name="tecnico_sel"]');
+  if(f) document.getElementById('id_tecnico').value=f.value;
+});
+</script>
 
 {% else %}
-
-<!-- TODOS OCUPADOS — LISTA DE ESPERA -->
-<div class="card" style="padding:18px;border-left:3px solid var(--warn);margin-bottom:20px;">
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
-    <i class="bi bi-clock-history" style="color:var(--warn);font-size:1.1rem;"></i>
-    <strong style="color:var(--t1);">Todos los técnicos están ocupados actualmente</strong>
-  </div>
-  <div style="font-size:.82rem;color:var(--t3);">
-    Puedes esperar a que se desocupe un técnico o asignar manualmente uno de todos modos.
-  </div>
+<!-- TODOS OCUPADOS -->
+<div style="background:var(--wg); border:1px solid var(--warn); border-radius:var(--r);
+            padding:1rem 1.2rem; margin-bottom:1.5rem;">
+  <strong style="color:var(--warn);">&#9888; Todos los técnicos están ocupados actualmente</strong><br>
+  <small style="color:var(--t2);">Puedes esperar a que se desocupe un técnico o asignar manualmente uno de todos modos.</small>
 </div>
 
-<div style="margin-bottom:8px;">
-  <strong style="color:var(--t1);">Lista de espera estimada</strong>
-</div>
-<div class="card" style="padding:18px;margin-bottom:20px;">
-  <div class="tw"><table>
+<h3 style="font-size:.95rem; color:var(--t1); margin-bottom:.8rem; font-weight:600;">Lista de espera estimada</h3>
+<div class="tw" style="margin-bottom:2rem;">
+  <table>
     <thead>
       <tr>
         <th>Técnico</th>
         <th>Especialidad</th>
-        <th>Trabajos activos</th>
-        <th>Se desocupa aprox.</th>
+        <th style="text-align:center;">Trabajos activos</th>
+        <th style="text-align:center;">Tiempo restante</th>
+        <th style="text-align:center;">Se desocupa aprox.</th>
       </tr>
     </thead>
     <tbody>
       {% for item in tecnicos_ocupados %}
       <tr>
         <td>
-          <strong>{{ item.tec.get_full_name|default:item.tec.username }}</strong><br>
-          <span style="font-size:.72rem;color:var(--t3);">@{{ item.tec.username }}</span>
+          <strong>{{ item.tec.get_full_name|default:item.tec.username }}</strong>
+          <div style="font-size:.72rem; color:var(--t3); font-family:'JetBrains Mono',monospace;">@{{ item.tec.username }}</div>
         </td>
-        <td>
-          {{ item.tec.get_especialidad_display }}
-          {% if item.tec.especialidad == 'otro' and item.tec.especialidad_otro %}
-            — {{ item.tec.especialidad_otro }}
+        <td>{{ item.tec.get_especialidad_display }}</td>
+        <td style="text-align:center;">
+          <span class="badge bm">{{ item.activos }} activo(s)</span>
+        </td>
+        <td style="text-align:center;">
+          {% if item.tiempo_restante %}
+            <span style="font-weight:700; font-family:'JetBrains Mono',monospace;
+              color:{% if 'vencido' in item.tiempo_restante %}var(--danger){% elif 'h' in item.tiempo_restante %}var(--warn){% else %}var(--success){% endif %};">
+              {{ item.tiempo_restante }}
+            </span>
+          {% else %}
+            <span style="color:var(--t3); font-size:.8rem;">Sin estimado</span>
           {% endif %}
         </td>
-        <td><span class="badge bm">{{ item.activos }} activo(s)</span></td>
-        <td>
+        <td style="text-align:center;">
           {% if item.proxima %}
-            <strong class="acc">{{ item.proxima|date:"d/m/Y" }}</strong>
+            <span class="acc mono">{{ item.proxima|date:"d/m/Y H:i" }}</span>
           {% else %}
-            <span style="color:var(--t3);">Sin fecha estimada</span>
+            <span style="color:var(--t3); font-size:.8rem;">Sin fecha</span>
           {% endif %}
         </td>
       </tr>
       {% endfor %}
     </tbody>
-  </table></div>
+  </table>
 </div>
 
-<!-- Asignar de todas formas -->
-<div class="card" style="padding:18px;border-top:2px dashed var(--border);">
-  <div style="font-weight:700;color:var(--t1);margin-bottom:12px;">
-    <i class="bi bi-exclamation-triangle" style="color:var(--warn);"></i>
-    Asignar de todas formas
-  </div>
-  <form method="POST">
+{% if lista_espera_clientes %}
+<h3 style="font-size:.95rem; color:var(--t1); margin-bottom:.8rem; font-weight:600;">
+  <i class="bi bi-people"></i> Clientes en lista de espera
+  <span style="background:var(--ag); color:var(--accent); font-size:.68rem; font-weight:700;
+               padding:.15rem .5rem; border-radius:20px; vertical-align:middle; margin-left:.4rem;
+               font-family:'JetBrains Mono',monospace;">
+    {{ lista_espera_clientes.count }}
+  </span>
+</h3>
+<div class="tw" style="margin-bottom:2rem;">
+  <table>
+    <thead>
+      <tr>
+        <th style="text-align:center;">Pos.</th>
+        <th>Solicitud</th>
+        <th>Cliente</th>
+        <th>Equipo</th>
+        <th>Tipo</th>
+        <th style="text-align:center;">Prioridad</th>
+        <th style="text-align:center;">Ingreso</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for sol in lista_espera_clientes %}
+      <tr>
+        <td style="text-align:center;">
+          <span style="font-family:'JetBrains Mono',monospace; color:var(--t3); font-size:.8rem;">
+            #{{ forloop.counter }}
+          </span>
+        </td>
+        <td>
+          <a href="{% url 'detalle_solicitud' sol.pk %}" class="acc mono" style="text-decoration:none; font-weight:600;">
+            #S-{{ sol.pk }}
+          </a>
+        </td>
+        <td><strong>{{ sol.cliente }}</strong></td>
+        <td style="color:var(--t2);">{{ sol.equipo.marca }} {{ sol.equipo.modelo }}</td>
+        <td>{{ sol.get_tipo_reparacion_display }}</td>
+        <td style="text-align:center;">
+          <span class="badge {% if sol.prioridad == 'alta' %}bh{% elif sol.prioridad == 'media' %}bm{% else %}bl{% endif %}">
+            {{ sol.get_prioridad_display }}
+          </span>
+        </td>
+        <td style="text-align:center; color:var(--t3); font-size:.78rem; font-family:'JetBrains Mono',monospace;">
+          {{ sol.creado_en|date:"d/m/Y" }}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endif %}
+
+<div class="card" style="margin-top:1rem;">
+  <div class="ct">&#9888; Asignar de todas formas</div>
+  <form method="post" style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
     {% csrf_token %}
-    <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;">
-      <div style="flex:1;min-width:200px;">
-        <label class="fl">Técnico</label>
-        <select name="tecnico" class="fc">
-          {% for item in tecnicos_ocupados %}
+    {{ form.tecnico }}
+    <div class="fg" style="flex:1; min-width:220px;">
+      <label class="fl">Técnico</label>
+      <select name="tecnico_forzado" id="sel_forzado" class="fc"
+              onchange="document.getElementById('id_tecnico').value=this.value">
+        {% for item in tecnicos_ocupados %}
           <option value="{{ item.tec.pk }}">
-            {{ item.tec.get_full_name|default:item.tec.username }}
-            ({{ item.activos }} activo{{ item.activos|pluralize }})
+            {{ item.tec.get_full_name|default:item.tec.username }} ({{ item.activos }} activo{{ item.activos|pluralize }})
           </option>
-          {% endfor %}
-        </select>
-      </div>
-      <button type="submit" class="btn btn-o">
-        <i class="bi bi-person-plus"></i> Asignar igualmente
-      </button>
+        {% endfor %}
+      </select>
     </div>
+    <button type="submit" class="btn btn-w"
+            onclick="document.getElementById('id_tecnico').value=document.getElementById('sel_forzado').value">
+      <i class="bi bi-person-check"></i> Asignar igualmente
+    </button>
   </form>
 </div>
 
+<script>
+document.addEventListener('DOMContentLoaded',()=>{
+  const s=document.getElementById('sel_forzado');
+  if(s) document.getElementById('id_tecnico').value=s.value;
+});
+</script>
 {% endif %}
 
-<style>
-.tec-card:hover { border-color: var(--accent) !important; }
-</style>
+</div>
 {% endblock %}

@@ -409,12 +409,14 @@ def cambiar_estado(request, pk):
 # ── ASIGNAR TÉCNICO ────────────────────────────────────────────
 @login_required(login_url='login')
 def asignar_tecnico(request, pk):
+    from django.db.models import Q
+    from django.utils import timezone
+
     if request.user.rol not in ['admin', 'recep']:
         return redirect('detalle_solicitud', pk=pk)
 
     solicitud = Solicitud.objects.get(pk=pk)
 
-    # Mapeo tipo de reparación → especialidad preferida
     MAPA_TIPO_ESP = {
         'hardware':   'hardware',
         'software':   'software',
@@ -422,61 +424,86 @@ def asignar_tecnico(request, pk):
         'revision':   'general',
     }
     esp_ideal = MAPA_TIPO_ESP.get(solicitud.tipo_reparacion, 'general')
+    tecnicos  = Usuario.objects.filter(rol='tec')
+    now       = timezone.now()
 
-    # Todos los técnicos
-    tecnicos = Usuario.objects.filter(rol='tec')
-
-    # Separar libres y ocupados
-    tecnicos_libres  = []
+    tecnicos_libres   = []
     tecnicos_ocupados = []
 
     for tec in tecnicos:
         activos = Solicitud.objects.filter(
-            detalle__tecnico=tec,
-            estado__in=['pendiente', 'proceso']
+            detalle__tecnico=tec, estado__in=['pendiente', 'proceso']
         ).count()
+
         if activos == 0:
             tecnicos_libres.append(tec)
         else:
-            # fecha estimada de desocupación = fecha_estimada más próxima
-            proxima = Solicitud.objects.filter(
+            proxima_sol = Solicitud.objects.filter(
                 detalle__tecnico=tec,
                 estado__in=['pendiente', 'proceso'],
                 fecha_estimada__isnull=False
             ).order_by('fecha_estimada').first()
+
+            fecha_libre     = proxima_sol.fecha_estimada if proxima_sol else None
+            tiempo_restante = None
+
+            if fecha_libre:
+                import datetime as dt_mod
+                if isinstance(fecha_libre, dt_mod.date) and not isinstance(fecha_libre, dt_mod.datetime):
+                    from django.utils.timezone import make_aware
+                    fecha_libre = make_aware(dt_mod.datetime.combine(fecha_libre, dt_mod.time(23, 59)))
+                delta         = fecha_libre - now
+                total_seconds = int(delta.total_seconds())
+                if total_seconds > 0:
+                    horas   = total_seconds // 3600
+                    minutos = (total_seconds % 3600) // 60
+                    if horas >= 48:
+                        dias = horas // 24
+                        tiempo_restante = f'{dias} día{"s" if dias != 1 else ""}'
+                    elif horas >= 1:
+                        tiempo_restante = f'{horas}h {minutos}min'
+                    else:
+                        tiempo_restante = f'{minutos} min'
+                else:
+                    tiempo_restante = 'Tiempo vencido'
+
             tecnicos_ocupados.append({
-                'tec':       tec,
-                'activos':   activos,
-                'proxima':   proxima.fecha_estimada if proxima else None,
+                'tec':             tec,
+                'activos':         activos,
+                'proxima':         fecha_libre,
+                'tiempo_restante': tiempo_restante,
             })
 
-    # Ordenar ocupados por fecha de desocupación
     tecnicos_ocupados.sort(key=lambda x: (x['proxima'] is None, x['proxima']))
 
-    # Calcular recomendación entre los libres
+    # Técnico recomendado entre los libres
     recomendado = None
     if tecnicos_libres:
         def puntaje(tec):
-            # 0 = mejor, mayor = peor
             match_esp = 0 if tec.especialidad == esp_ideal else (1 if tec.especialidad == 'general' else 2)
             historico = Solicitud.objects.filter(detalle__tecnico=tec).count()
             return (match_esp, historico)
         recomendado = min(tecnicos_libres, key=puntaje)
 
+    # Lista de espera: solicitudes pendientes sin técnico asignado (excluye la actual)
+    lista_espera_clientes = Solicitud.objects.filter(
+        estado='pendiente'
+    ).filter(
+        Q(detalle__isnull=True) | Q(detalle__tecnico__isnull=True)
+    ).exclude(pk=pk).select_related('cliente', 'equipo').order_by('creado_en')
+
     if request.method == 'POST':
         form = AsignarTecnicoForm(request.POST)
         if form.is_valid():
-            tec_id = form.cleaned_data['tecnico'].pk
+            tec_id  = form.cleaned_data['tecnico'].pk
             tec_obj = Usuario.objects.get(pk=tec_id)
-            det = solicitud.detalle
+            det     = solicitud.detalle
             det.tecnico = tec_obj
             det.save()
             HistorialEstado.objects.create(
-                solicitud    = solicitud,
-                usuario      = request.user,
-                estado_antes = solicitud.estado,
-                estado_nuevo = 'proceso',
-                observacion  = f'Técnico asignado: {tec_obj.get_full_name() or tec_obj.username}'
+                solicitud=solicitud, usuario=request.user,
+                estado_antes=solicitud.estado, estado_nuevo='proceso',
+                observacion=f'Técnico asignado: {tec_obj.get_full_name() or tec_obj.username}'
             )
             solicitud.estado = 'proceso'
             solicitud.save()
@@ -486,13 +513,14 @@ def asignar_tecnico(request, pk):
         form = AsignarTecnicoForm()
 
     return render(request, 'core/solicitudes/asignar_tecnico.html', {
-        'solicitud':         solicitud,
-        'form':              form,
-        'tecnicos_libres':   tecnicos_libres,
-        'tecnicos_ocupados': tecnicos_ocupados,
-        'recomendado':       recomendado,
-        'esp_ideal':         esp_ideal,
-        'hay_libres':        len(tecnicos_libres) > 0,
+        'solicitud':             solicitud,
+        'form':                  form,
+        'tecnicos_libres':       tecnicos_libres,
+        'tecnicos_ocupados':     tecnicos_ocupados,
+        'recomendado':           recomendado,
+        'esp_ideal':             esp_ideal,
+        'hay_libres':            len(tecnicos_libres) > 0,
+        'lista_espera_clientes': lista_espera_clientes,
     })
 
     # ── REGISTRAR USUARIO ──────────────────────────────────────────
