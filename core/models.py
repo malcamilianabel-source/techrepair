@@ -116,8 +116,8 @@ class Solicitud(models.Model):
                                           related_name='solicitudes')
     equipo           = models.ForeignKey(Equipo, on_delete=models.PROTECT,
                                           related_name='solicitudes')
-    tipo_reparacion  = models.CharField(max_length=20, choices=TIPOS_REP,
-                                         blank=True)
+    tipo_reparacion  = models.CharField(max_length=20, choices=TIPOS_REP)
+                                         
     descripcion      = models.TextField()
     observaciones    = models.TextField(blank=True)
     prioridad        = models.CharField(max_length=10, choices=PRIORIDADES,

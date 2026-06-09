@@ -129,6 +129,12 @@ class SolicitudForm(forms.ModelForm):
             'prioridad':      'Prioridad',
         }
 
+    def clean_tipo_reparacion(self):
+        valor = self.cleaned_data.get('tipo_reparacion')
+        if not valor:
+            raise forms.ValidationError('Debes seleccionar un tipo de reparación.')
+        return valor
+
 
 # ── FORMULARIO CAMBIAR ESTADO ──────────────────────────────────
 class CambiarEstadoForm(forms.Form):

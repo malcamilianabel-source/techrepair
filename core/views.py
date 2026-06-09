@@ -227,17 +227,38 @@ def registrar_equipo(request):
 
 # ── MOTOR DE ESTIMACIÓN DE TIEMPO ─────────────────────────────
 def calcular_tiempo_estimado(tipo, prioridad, fecha_ingreso):
-    # Tiempos en horas según tipo y prioridad
-    tiempos_horas = {
-        'preventivo': {'alta': 1, 'media': 2,  'baja': 3},
-        'revision':   {'alta': 1, 'media': 1,  'baja': 2},
-        'software':   {'alta': 2, 'media': 2,  'baja': 3},
-        'hardware':   {'alta': 1, 'media': 3,  'baja': 5},
+    import math
+    tiempos_base = {
+        'revision':   1,
+        'preventivo': 2,
+        'software':   3,
+        'hardware':   6,
     }
-    horas = tiempos_horas.get(tipo, {}).get(prioridad, 3)
-    tiempo_texto = f"{horas} hora(s)"
+    multiplicadores = {
+        'alta':  0.75,
+        'media': 1.0,
+        'baja':  1.5,
+    }
+    base = tiempos_base.get(tipo, 3)
+    mult = multiplicadores.get(prioridad, 1.0)
+    horas = base * mult  
 
-    return 0, fecha_ingreso, tiempo_texto
+
+    if horas < 1:
+        minutos = round(horas * 60)
+        tiempo_texto = f"{minutos} minutos"
+    elif horas == int(horas):
+        tiempo_texto = f"{int(horas)} hora{'s' if horas != 1 else ''}"
+    else:
+        horas_int = int(horas)
+        minutos = round((horas - horas_int) * 60)
+        tiempo_texto = f"{horas_int}h {minutos}min"
+
+    
+    fecha_estimada = datetime.datetime.combine(fecha_ingreso, datetime.time(8, 0))
+    fecha_estimada = fecha_estimada + datetime.timedelta(hours=horas)
+    dias_estimados = math.ceil(horas / 8)  
+    return dias_estimados, fecha_estimada.date(), tiempo_texto
 
 
 # ── REGISTRAR SOLICITUD ────────────────────────────────────────
