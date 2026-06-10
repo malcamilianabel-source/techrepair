@@ -284,6 +284,24 @@ class AvanceForm(forms.ModelForm):
         }
 
 
+# ── FORMULARIO NOTA DE BITÁCORA (libre, sin etapa) ─────────────
+class NotaBitacoraForm(forms.ModelForm):
+    class Meta:
+        model  = Avance
+        fields = ['descripcion', 'visible_cliente']
+        widgets = {
+            'descripcion': forms.Textarea(attrs={
+                'class': 'fc',
+                'rows': 3,
+                'placeholder': 'Escribe una nota u observación específica (hallazgos, repuestos, pendientes, etc.)...'}),
+            'visible_cliente': forms.CheckboxInput(attrs={'class': 'fc-check'}),
+        }
+        labels = {
+            'descripcion': 'Nota / comentario',
+            'visible_cliente': 'Mostrar esta nota al cliente en su seguimiento',
+        }
+
+
 # ── FORMULARIO ACTUALIZAR EQUIPO ───────────────────────────────
 class EquipoUpdateForm(forms.ModelForm):
     tipo_personalizado = forms.CharField(

@@ -128,6 +128,7 @@ class Solicitud(models.Model):
     fecha_ingreso    = models.DateField(auto_now_add=True)
     dias_estimados        = models.IntegerField(null=True, blank=True)
     fecha_estimada        = models.DateField(null=True, blank=True)
+    fecha_hora_estimada   = models.DateTimeField(null=True, blank=True)
     tiempo_estimado_texto = models.CharField(max_length=50, blank=True, default='')
     tiempo_estimado_horas = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     fecha_entrega        = models.DateField(null=True, blank=True)
@@ -169,12 +170,18 @@ class Avance(models.Model):
         ('ensamblaje',  'Ensamblaje'),
         ('prueba_final','Prueba final'),
     ]
+    TIPOS = [
+        ('etapa', 'Avance de etapa'),
+        ('nota',  'Nota / comentario'),
+    ]
     solicitud   = models.ForeignKey(Solicitud, on_delete=models.CASCADE,
                                      related_name='avances')
     usuario     = models.ForeignKey(Usuario, on_delete=models.SET_NULL,
                                      null=True, related_name='avances')
-    etapa       = models.CharField(max_length=20, choices=ETAPAS)
+    tipo        = models.CharField(max_length=10, choices=TIPOS, default='etapa')
+    etapa       = models.CharField(max_length=20, choices=ETAPAS, blank=True, default='')
     descripcion = models.TextField()
+    visible_cliente = models.BooleanField(default=False)
     fecha_hora  = models.DateTimeField(auto_now_add=True)
 
     class Meta:

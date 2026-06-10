@@ -112,7 +112,14 @@
             {% elif sol.estado == 'entregado' %}
               <span style="color:var(--success);">Entregado</span>
             {% elif sol.tiempo_estimado_texto and sol.detalle.tecnico %}
-              <span style="color:var(--accent);">{{ sol.tiempo_estimado_texto }}</span>
+              {% if sol.fecha_hora_estimada %}
+                <span class="countdown" data-target="{{ sol.fecha_hora_estimada|date:'c' }}"
+                  style="font-weight:700; font-family:'JetBrains Mono',monospace;">
+                  {{ sol.tiempo_estimado_texto }}
+                </span>
+              {% else %}
+                <span style="color:var(--accent);">{{ sol.tiempo_estimado_texto }}</span>
+              {% endif %}
             {% else %}
               <span style="color:var(--t3);">Por definirse</span>
             {% endif %}

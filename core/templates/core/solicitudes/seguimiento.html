@@ -104,9 +104,19 @@
       background: #3dd68c;
       box-shadow: 0 0 6px rgba(61,214,140,.4);
     }
+    .tl-dot.nota {
+      background: #5b8dee;
+      box-shadow: 0 0 6px rgba(91,141,238,.4);
+    }
     .tl-dot.pending {
       background: transparent;
       border: 2px solid rgba(255,255,255,.12);
+    }
+    .tl-note-text {
+      font-size: .78rem;
+      color: #94a3b8;
+      margin-top: 4px;
+      line-height: 1.4;
     }
     .tl-connector {
       width: 2px;
@@ -233,24 +243,33 @@
     <!-- PROGRESO DE REPARACIÓN -->
     <div class="card">
       <div class="card-title">Progreso de reparación</div>
-      {% if progreso_etapas %}
+      {% if timeline %}
       <div class="tl">
-        {% for etapa_key, etapa_label, av in progreso_etapas %}
+        {% for item in timeline %}
         <div class="tl-item">
           <div class="tl-line">
-            <div class="tl-dot {% if av %}done{% else %}pending{% endif %}"></div>
+            {% if item.tipo == 'nota' %}
+            <div class="tl-dot nota"></div>
+            {% elif item.av %}
+            <div class="tl-dot done"></div>
+            {% else %}
+            <div class="tl-dot pending"></div>
+            {% endif %}
             {% if not forloop.last %}
-            <div class="tl-connector {% if av %}done{% else %}pending{% endif %}"></div>
+            <div class="tl-connector {% if item.av %}done{% else %}pending{% endif %}"></div>
             {% endif %}
           </div>
           <div>
-            <div class="tl-label {% if av %}done{% else %}pending{% endif %}">
-              {{ etapa_label }}
+            <div class="tl-label {% if item.av %}done{% else %}pending{% endif %}">
+              {% if item.tipo == 'nota' %}<i class="bi bi-chat-left-text"></i> {% endif %}{{ item.label }}
             </div>
-            {% if av %}
+            {% if item.av %}
             <div class="tl-meta">
-              {{ av.fecha_hora|date:"d/m/Y H:i" }}
+              {{ item.fecha|date:"d/m/Y H:i" }}
             </div>
+            {% if item.tipo == 'nota' %}
+            <div class="tl-note-text">{{ item.av.descripcion }}</div>
+            {% endif %}
             {% else %}
             <div class="tl-meta">Pendiente</div>
             {% endif %}

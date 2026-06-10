@@ -32,6 +32,7 @@
     {% else %}
     <form method="POST">
       {% csrf_token %}
+      <input type="hidden" name="form_type" value="etapa">
       <div style="display:flex;flex-direction:column;gap:14px;">
         <div class="fg">
           <label class="fl">Etapa <span style="color:var(--danger);">*</span></label>
@@ -62,6 +63,36 @@
     {% endif %}
   </div>
 
+  <!-- NOTA / COMENTARIO LIBRE -->
+  <div class="card" style="margin-top:20px;">
+    <div class="ct">Agregar nota / comentario</div>
+    <div class="ps" style="margin-bottom:10px;">
+      Usa esto para anotar detalles específicos (hallazgos, repuestos, pendientes, etc.)
+      sin necesidad de avanzar de etapa. Puedes agregar varias notas.
+    </div>
+    <form method="POST">
+      {% csrf_token %}
+      <input type="hidden" name="form_type" value="nota">
+      <div class="fg">
+        {{ nota_form.descripcion }}
+        {% if nota_form.descripcion.errors %}
+        <span style="color:var(--danger);font-size:.72rem;">{{ nota_form.descripcion.errors|join:", " }}</span>
+        {% endif %}
+      </div>
+      <div class="fg" style="flex-direction:row;align-items:center;gap:8px;margin-top:8px;">
+        {{ nota_form.visible_cliente }}
+        <label class="fl" for="{{ nota_form.visible_cliente.id_for_label }}" style="margin:0;">
+          <i class="bi bi-eye"></i> {{ nota_form.fields.visible_cliente.label }}
+        </label>
+      </div>
+      <div style="margin-top:12px;">
+        <button class="btn btn-o" type="submit">
+          <i class="bi bi-chat-left-text"></i> Agregar nota
+        </button>
+      </div>
+    </form>
+  </div>
+
   <!-- BITÁCORA -->
   <div class="card">
     <div class="ct">Historial de avances ({{ avances.count }})</div>
@@ -70,11 +101,27 @@
       {% for av in avances %}
       <div class="tl-item">
         <div class="tl-l">
+          {% if av.tipo == 'nota' %}
+          <div class="tl-dot note"></div>
+          {% else %}
           <div class="tl-dot {% if forloop.last %}act{% else %}done{% endif %}"></div>
+          {% endif %}
           {% if not forloop.last %}<div class="tl-con"></div>{% endif %}
         </div>
         <div class="tl-c">
+          {% if av.tipo == 'nota' %}
+          <div class="tl-t" style="color:var(--accent);">
+            <i class="bi bi-chat-left-text"></i> Nota
+            {% if av.visible_cliente %}
+            <span style="font-size:.65rem;font-weight:700;color:var(--success);
+              border:1px solid var(--success);border-radius:8px;padding:1px 6px;margin-left:6px;">
+              <i class="bi bi-eye"></i> visible al cliente
+            </span>
+            {% endif %}
+          </div>
+          {% else %}
           <div class="tl-t">{{ av.get_etapa_display }}</div>
+          {% endif %}
           <div class="tl-m">
             {{ av.fecha_hora|date:"d/m/Y H:i" }} —
             {{ av.usuario.get_full_name|default:av.usuario.username }}
@@ -101,6 +148,7 @@
 .tl-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:4px;border:2px solid var(--card);}
 .tl-dot.done{background:var(--success);}
 .tl-dot.act{background:var(--teal);}
+.tl-dot.note{background:var(--accent);}
 .tl-con{width:2px;background:var(--border);flex:1;margin-top:4px;}
 .tl-c{flex:1;}
 .tl-t{font-size:.82rem;font-weight:600;color:var(--t1);}

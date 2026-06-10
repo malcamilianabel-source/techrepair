@@ -8,7 +8,7 @@ from .models import (Usuario, Cliente, Equipo, Solicitud, DetalleSolicitud,
                      HistorialEstado, Avance, Repuesto, Costo, AmpliacionTiempo)
 from .forms import (ClienteForm, EquipoForm, EquipoUpdateForm, SolicitudForm,
                     CambiarEstadoForm, AsignarTecnicoForm, UsuarioForm,
-                    DiagnosticoForm, AvanceForm, AmpliacionTiempoForm)
+                    DiagnosticoForm, AvanceForm, NotaBitacoraForm, AmpliacionTiempoForm)
 
 # deploy test
 
@@ -299,7 +299,7 @@ def calcular_tiempo_estimado(tipo, estado_fisico, fecha_ingreso):
     fecha_estimada = calcular_fecha_libre_laboral(inicio, horas)
     dias_estimados = math.ceil(horas / 8)
 
-    return dias_estimados, fecha_estimada.date(), tiempo_texto, horas
+    return dias_estimados, fecha_estimada.date(), tiempo_texto, horas, fecha_estimada
 
 
 # ── REGISTRAR SOLICITUD ────────────────────────────────────────
@@ -351,13 +351,14 @@ def registrar_solicitud(request):
                     'cliente_fijo': cliente_fijo,
                     'equipo_fijo':  equipo_fijo,
                 })
-            dias, fecha_est, tiempo_texto, horas_est = calcular_tiempo_estimado(
+            dias, fecha_est, tiempo_texto, horas_est, fecha_hora_est = calcular_tiempo_estimado(
                  solicitud.tipo_reparacion,
                  solicitud.equipo.estado,
                  datetime.date.today()
             )
             solicitud.dias_estimados        = dias
             solicitud.fecha_estimada        = fecha_est
+            solicitud.fecha_hora_estimada   = fecha_hora_est
             solicitud.tiempo_estimado_texto = tiempo_texto
             solicitud.tiempo_estimado_horas = horas_est
             solicitud.save()
@@ -637,6 +638,7 @@ def asignar_tecnico(request, pk):
                 inicio = calcular_fecha_libre_laboral(inicio, horas_actuales)
             nueva_fecha = calcular_fecha_libre_laboral(inicio, float(solicitud.tiempo_estimado_horas or 0))
             solicitud.fecha_estimada = nueva_fecha.date()
+            solicitud.fecha_hora_estimada = nueva_fecha
 
             # Solo avanzar a proceso si estaba pendiente; si ya estaba en proceso, mantener
             estado_antes = solicitud.estado
@@ -742,9 +744,23 @@ def avance(request, pk):
 
     choices = [('', '---------')] + [(e, ETAPA_LABELS.get(e, e)) for e in etapas_disponibles]
 
-    if request.method == 'POST':
+    if request.method == 'POST' and request.POST.get('form_type') == 'nota':
+        form = AvanceForm()
+        form.fields['etapa'].choices = choices
+        nota_form = NotaBitacoraForm(request.POST)
+        if nota_form.is_valid():
+            nota           = nota_form.save(commit=False)
+            nota.solicitud = solicitud
+            nota.usuario   = request.user
+            nota.tipo      = 'nota'
+            nota.etapa     = ''
+            nota.save()
+            messages.success(request, 'Nota registrada correctamente.')
+            return redirect('avance', pk=pk)
+    elif request.method == 'POST':
         form = AvanceForm(request.POST)
         form.fields['etapa'].choices = choices
+        nota_form = NotaBitacoraForm()
         if form.is_valid():
             if form.cleaned_data['etapa'] not in etapas_disponibles:
                 messages.error(request, 'Esa etapa no está disponible.')
@@ -752,15 +768,18 @@ def avance(request, pk):
             av           = form.save(commit=False)
             av.solicitud = solicitud
             av.usuario   = request.user
+            av.tipo      = 'etapa'
             av.save()
             messages.success(request, 'Avance registrado correctamente.')
             return redirect('avance', pk=pk)
     else:
         form = AvanceForm()
         form.fields['etapa'].choices = choices
+        nota_form = NotaBitacoraForm()
 
     return render(request, 'core/solicitudes/avance.html', {
         'form':        form,
+        'nota_form':   nota_form,
         'solicitud':   solicitud,
         'avances':     avances,
         'sin_etapas':  not etapas_disponibles,
@@ -1042,13 +1061,15 @@ from django.http import JsonResponse
 @login_required(login_url='login')
 def equipos_por_cliente(request, cliente_id):
     equipos = Equipo.objects.filter(cliente_id=cliente_id).values(
-        'id', 'marca', 'modelo', 'serie'
+        'id', 'tipo', 'marca', 'modelo', 'serie'
     )
+    TIPO_LABELS = dict(Equipo.TIPOS)
     data = []
     for e in equipos:
+        tipo_label = TIPO_LABELS.get(e['tipo'], e['tipo'])
         data.append({
             'id':    e['id'],
-            'texto': f"{e['marca'].upper()} {e['modelo']} — Serie: {e['serie']}"
+            'texto': f"{tipo_label} — {e['marca'].upper()} {e['modelo']} — Serie: {e['serie']}"
         })
     return JsonResponse({'equipos': data})
 
@@ -1073,9 +1094,26 @@ def seguimiento(request, pk):
     avances_dict    = {av.etapa: av for av in avances}
     progreso_etapas = [(k, ETAPA_LABELS.get(k, k), avances_dict.get(k)) for k in ETAPA_ORDEN]
 
+    # Línea de tiempo combinada: etapas completadas + notas visibles para el cliente,
+    # ordenadas cronológicamente. Las etapas pendientes se muestran al final.
+    timeline = []
+    for k, label, av in progreso_etapas:
+        if av:
+            timeline.append({'tipo': 'etapa', 'label': label, 'fecha': av.fecha_hora, 'av': av})
+    for nota in avances:
+        if nota.tipo == 'nota' and nota.visible_cliente:
+            timeline.append({'tipo': 'nota', 'label': 'Nota del taller', 'fecha': nota.fecha_hora, 'av': nota})
+    timeline.sort(key=lambda x: x['fecha'])
+
+    pendientes = [{'tipo': 'etapa', 'label': label, 'fecha': None, 'av': None}
+                   for k, label, av in progreso_etapas if not av]
+
+    timeline_completa = timeline + pendientes
+
     return render(request, 'core/solicitudes/seguimiento.html', {
         'solicitud':       solicitud,
         'progreso_etapas': progreso_etapas,
+        'timeline':        timeline_completa,
     })
 
 
@@ -1492,6 +1530,8 @@ def solicitar_ampliacion(request, pk):
                 else:
                     delta = datetime.timedelta(minutes=cantidad)
                 solicitud.fecha_estimada = solicitud.fecha_estimada + delta
+                if solicitud.fecha_hora_estimada:
+                    solicitud.fecha_hora_estimada = solicitud.fecha_hora_estimada + delta
 
             sufijo = f'+{cantidad} {"h" if unidad == "horas" else "min"}'
             if solicitud.tiempo_estimado_texto:

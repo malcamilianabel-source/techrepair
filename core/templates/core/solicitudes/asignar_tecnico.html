@@ -105,9 +105,9 @@ document.addEventListener('DOMContentLoaded',()=>{
           <span class="badge bm">{{ item.activos }} activo(s)</span>
         </td>
         <td style="text-align:center;">
-          {% if item.tiempo_restante %}
-            <span style="font-weight:700; font-family:'JetBrains Mono',monospace;
-              color:{% if 'vencido' in item.tiempo_restante %}var(--danger){% elif 'h' in item.tiempo_restante %}var(--warn){% else %}var(--success){% endif %};">
+          {% if item.proxima %}
+            <span class="countdown" data-target="{{ item.proxima|date:'c' }}"
+              style="font-weight:700; font-family:'JetBrains Mono',monospace;">
               {{ item.tiempo_restante }}
             </span>
           {% else %}
@@ -188,7 +188,9 @@ document.addEventListener('DOMContentLoaded',()=>{
     <i class="bi bi-star-fill" style="color:var(--accent);"></i>
     <span style="color:var(--t2);">Recomendado:</span>
     <strong style="color:var(--accent);">{{ recomendado_ocupado.tec.get_full_name|default:recomendado_ocupado.tec.username }}</strong>
-    <span style="color:var(--t3);">— se desocupa en {{ recomendado_ocupado.tiempo_restante }}
+    <span style="color:var(--t3);">— se desocupa en
+      <span class="countdown" data-target="{{ recomendado_ocupado.proxima|date:'c' }}"
+        style="font-weight:700; font-family:'JetBrains Mono',monospace;">{{ recomendado_ocupado.tiempo_restante }}</span>
       ({{ recomendado_ocupado.proxima|date:"d/m/Y H:i" }})</span>
   </div>
   {% endif %}
@@ -224,4 +226,6 @@ document.addEventListener('DOMContentLoaded',()=>{
 {% endif %}
 
 </div>
+
+
 {% endblock %}
