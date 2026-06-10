@@ -15,11 +15,19 @@
 
 {% if messages %}
   {% for msg in messages %}
+  {% if msg.tags == 'error' %}
+  <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.3);color:var(--danger);
+    padding:10px 14px;border-radius:var(--rs);font-size:.82rem;
+    display:flex;align-items:center;gap:8px;margin-bottom:14px;">
+    <i class="bi bi-exclamation-triangle-fill"></i> {{ msg }}
+  </div>
+  {% else %}
   <div style="background:var(--sg);border:1px solid rgba(61,214,140,.3);color:var(--success);
     padding:10px 14px;border-radius:var(--rs);font-size:.82rem;
     display:flex;align-items:center;gap:8px;margin-bottom:14px;">
     <i class="bi bi-check-circle-fill"></i> {{ msg }}
   </div>
+  {% endif %}
   {% endfor %}
 {% endif %}
 
@@ -52,6 +60,7 @@
           <th style="text-align:center;">Rol</th>
           <th style="text-align:center;">Especialidad</th>
           <th style="text-align:center;">Estado</th>
+          <th style="text-align:center;">Acciones</th>
         </tr>
       </thead>
       <tbody>
@@ -83,10 +92,20 @@
               <span style="color:var(--danger);font-size:.8rem;">&#9679; Inactivo</span>
             {% endif %}
           </td>
+          <td style="text-align:center;">
+            <form method="POST" action="{% url 'eliminar_usuario' u.pk %}"
+              onsubmit="return confirm('¿Seguro que deseas eliminar al usuario \'{{ u.get_full_name|default:u.username }}\'? Esta acción no se puede deshacer.');"
+              style="display:inline;">
+              {% csrf_token %}
+              <button type="submit" class="btn btn-o" style="padding:4px 10px;color:var(--danger);border-color:rgba(239,68,68,.3);">
+                <i class="bi bi-trash3"></i>
+              </button>
+            </form>
+          </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="6" style="text-align:center;padding:30px;color:var(--t3);">
+          <td colspan="7" style="text-align:center;padding:30px;color:var(--t3);">
             <i class="bi bi-person-slash" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
             {% if query %}
               No se encontraron usuarios con "{{ query }}"

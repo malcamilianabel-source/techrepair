@@ -44,6 +44,7 @@ urlpatterns = [
     # ── USUARIOS ──
     path('usuarios/registrar/', views.registrar_usuario, name='registrar_usuario'),
     path('usuarios/consultar/', views.consultar_usuarios, name='consultar_usuarios'),
+    path('usuarios/<int:pk>/eliminar/', views.eliminar_usuario, name='eliminar_usuario'),
 
     # ── REPORTES ──
     path('reportes/', views.reportes, name='reportes'),

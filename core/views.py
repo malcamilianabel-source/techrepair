@@ -1,6 +1,6 @@
 import datetime
 from django.db.models.deletion import ProtectedError
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -707,6 +707,42 @@ def consultar_usuarios(request):
         'usuarios': usuarios,
         'query':    query,
     })
+
+# ── ELIMINAR USUARIO ────────────────────────────────────────────
+@login_required(login_url='login')
+def eliminar_usuario(request, pk):
+    if request.user.rol != 'admin':
+        return redirect('dashboard')
+
+    usuario = get_object_or_404(Usuario, pk=pk)
+
+    if usuario.pk == request.user.pk:
+        messages.error(request, 'No puedes eliminar tu propio usuario.')
+        return redirect('consultar_usuarios')
+
+    if request.method == 'POST':
+        # Verificar si el técnico tiene trabajos en curso asignados
+        trabajos_activos = DetalleSolicitud.objects.filter(
+            tecnico=usuario,
+            solicitud__estado__in=['pendiente', 'proceso']
+        ).count()
+
+        if trabajos_activos > 0:
+            messages.error(
+                request,
+                f'No se puede eliminar a "{usuario.get_full_name() or usuario.username}" '
+                f'porque tiene {trabajos_activos} solicitud(es) activa(s) asignada(s). '
+                f'Reasigna esos trabajos a otro técnico antes de eliminarlo, '
+                f'o desactiva su cuenta en su lugar.'
+            )
+            return redirect('consultar_usuarios')
+
+        nombre = usuario.get_full_name() or usuario.username
+        usuario.delete()
+        messages.success(request, f'Usuario "{nombre}" eliminado correctamente.')
+        return redirect('consultar_usuarios')
+
+    return redirect('consultar_usuarios')
 
     # ── DIAGNÓSTICO ────────────────────────────────────────────────
 @login_required(login_url='login')
