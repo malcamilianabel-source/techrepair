@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin
 from .models import (Usuario, Cliente, Equipo, Solicitud,
                      DetalleSolicitud, Avance, Repuesto,
                      Costo, HistorialEstado, Notificacion)
-
+#nuevo registro
 @admin.register(Usuario)
 class UsuarioAdmin(UserAdmin):
     list_display  = ('username', 'get_full_name', 'rol', 'email')
