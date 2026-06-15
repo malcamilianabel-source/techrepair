@@ -11,7 +11,7 @@ class UsuarioAdmin(UserAdmin):
     fieldsets     = UserAdmin.fieldsets + (
         ('Datos adicionales', {'fields': ('rol', 'telefono', 'dni')}),
     )
-
+#nuevo registro cliente
 @admin.register(Cliente)
 class ClienteAdmin(admin.ModelAdmin):
     list_display  = ('nombre', 'dni', 'telefono', 'correo')
