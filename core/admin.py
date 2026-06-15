@@ -44,6 +44,7 @@ class AvanceAdmin(admin.ModelAdmin):
 @admin.register(Repuesto)
 class RepuestoAdmin(admin.ModelAdmin):
     list_display  = ('nombre', 'cantidad', 'precio_unit', 'solicitud')
+#nuevo registro costo
 
 @admin.register(Costo)
 class CostoAdmin(admin.ModelAdmin):
