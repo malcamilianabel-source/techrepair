@@ -22,7 +22,7 @@ class EquipoAdmin(admin.ModelAdmin):
     list_display  = ('marca', 'modelo', 'serie', 'tipo', 'cliente')
     search_fields = ('marca', 'modelo', 'serie')
     list_filter   = ('tipo', 'estado')
-
+#nuevo registro equipo solicitud
 @admin.register(Solicitud)
 class SolicitudAdmin(admin.ModelAdmin):
     list_display  = ('id', 'cliente', 'equipo', 'estado', 'prioridad', 'fecha_ingreso')
