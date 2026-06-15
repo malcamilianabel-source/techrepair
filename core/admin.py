@@ -33,6 +33,7 @@ class SolicitudAdmin(admin.ModelAdmin):
 @admin.register(DetalleSolicitud)
 class DetalleSolicitudAdmin(admin.ModelAdmin):
     list_display  = ('solicitud', 'tecnico')
+#nuevo registro equipo avance
 
 @admin.register(Avance)
 class AvanceAdmin(admin.ModelAdmin):
