@@ -39,6 +39,7 @@ class DetalleSolicitudAdmin(admin.ModelAdmin):
 class AvanceAdmin(admin.ModelAdmin):
     list_display  = ('solicitud', 'etapa', 'usuario', 'fecha_hora')
     list_filter   = ('etapa',)
+#nuevo registro equipo repuesto
 
 @admin.register(Repuesto)
 class RepuestoAdmin(admin.ModelAdmin):
