@@ -49,6 +49,7 @@ class RepuestoAdmin(admin.ModelAdmin):
 @admin.register(Costo)
 class CostoAdmin(admin.ModelAdmin):
     list_display  = ('solicitud', 'mano_obra', 'total')
+#nuevo registro HistorialEstado
 
 @admin.register(HistorialEstado)
 class HistorialEstadoAdmin(admin.ModelAdmin):
