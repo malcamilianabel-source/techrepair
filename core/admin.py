@@ -16,7 +16,7 @@ class UsuarioAdmin(UserAdmin):
 class ClienteAdmin(admin.ModelAdmin):
     list_display  = ('nombre', 'dni', 'telefono', 'correo')
     search_fields = ('nombre', 'dni', 'telefono')
-
+#nuevo registro equipo
 @admin.register(Equipo)
 class EquipoAdmin(admin.ModelAdmin):
     list_display  = ('marca', 'modelo', 'serie', 'tipo', 'cliente')
