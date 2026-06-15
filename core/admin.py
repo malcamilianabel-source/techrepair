@@ -28,6 +28,7 @@ class SolicitudAdmin(admin.ModelAdmin):
     list_display  = ('id', 'cliente', 'equipo', 'estado', 'prioridad', 'fecha_ingreso')
     search_fields = ('cliente__nombre',)
     list_filter   = ('estado', 'prioridad', 'tipo_reparacion')
+#nuevo registro equipo Detallesolicitud
 
 @admin.register(DetalleSolicitud)
 class DetalleSolicitudAdmin(admin.ModelAdmin):
