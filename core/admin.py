@@ -55,7 +55,7 @@ class CostoAdmin(admin.ModelAdmin):
 class HistorialEstadoAdmin(admin.ModelAdmin):
     list_display  = ('solicitud', 'estado_antes', 'estado_nuevo',
                      'usuario', 'fecha_hora')
-
+#nuevo registro notificacion
 @admin.register(Notificacion)
 class NotificacionAdmin(admin.ModelAdmin):
     list_display  = ('solicitud', 'medio', 'enviado', 'fecha_hora')

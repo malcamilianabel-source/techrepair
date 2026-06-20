@@ -1,5 +1,5 @@
 from django.db import migrations, models
-
+#equipos personalizados
 class Migration(migrations.Migration):
 
     dependencies = [

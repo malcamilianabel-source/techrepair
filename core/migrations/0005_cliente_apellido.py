@@ -1,6 +1,6 @@
 from django.db import migrations, models
 
-
+#solicitud de confirmacion
 class Migration(migrations.Migration):
 
     dependencies = [

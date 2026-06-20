@@ -107,7 +107,7 @@ class CalcularTiempoEstimadoTests(TestCase):
         )
         self.assertEqual(horas, 1.0)
         self.assertEqual(texto, '1 hora')
-
+# CALCULO DE TIEMPO EQUIPO MALO
     def test_hardware_equipo_malo(self):
         """
         [Refactor] Hardware + equipo malo = 6h x 1.5 = 9 horas.
@@ -118,7 +118,7 @@ class CalcularTiempoEstimadoTests(TestCase):
         )
         self.assertEqual(horas, 9.0)
         self.assertEqual(dias, 2)
-
+# CALCULO DE TIEMPO EQUIPO ESTADO REGULAR
     def test_software_equipo_regular(self):
         """
         [Refactor] Software + regular = 3h x 1.25 = 3.75h = '3h 45min'.
