@@ -142,6 +142,45 @@ class SolicitudForm(forms.ModelForm):
         return valor
 
 
+# ── FORMULARIO ACTUALIZAR CLIENTE (sin DNI) ────────────────────
+class ClienteUpdateForm(forms.ModelForm):
+    class Meta:
+        model  = Cliente
+        fields = ['nombre', 'apellido', 'telefono', 'direccion', 'correo']
+        widgets = {
+            'nombre':    forms.TextInput(attrs={'class': 'fc'}),
+            'apellido':  forms.TextInput(attrs={'class': 'fc'}),
+            'telefono':  forms.TextInput(attrs={
+                'class': 'fc', 'maxlength': '9',
+                'inputmode': 'numeric', 'pattern': '9[0-9]{8}'}),
+            'direccion': forms.TextInput(attrs={'class': 'fc'}),
+            'correo':    forms.EmailInput(attrs={'class': 'fc'}),
+        }
+        labels = {
+            'nombre':   'Nombres',
+            'apellido': 'Apellidos',
+            'telefono': 'Teléfono',
+            'direccion':'Dirección',
+            'correo':   'Correo electrónico',
+        }
+
+    def clean_nombre(self):
+        return self.cleaned_data.get('nombre', '').strip().title()
+
+    def clean_apellido(self):
+        return self.cleaned_data.get('apellido', '').strip().title()
+
+    def clean_telefono(self):
+        tel = self.cleaned_data.get('telefono', '')
+        if not tel.isdigit():
+            raise forms.ValidationError('El teléfono solo debe contener números.')
+        if not tel.startswith('9'):
+            raise forms.ValidationError('El teléfono debe empezar con 9.')
+        if len(tel) != 9:
+            raise forms.ValidationError('El teléfono debe tener 9 dígitos.')
+        return tel
+
+
 # ── FORMULARIO CAMBIAR ESTADO ──────────────────────────────────
 class CambiarEstadoForm(forms.Form):
     ESTADOS_ADMIN = [
@@ -221,6 +260,11 @@ class UsuarioForm(forms.ModelForm):
         valor = self.cleaned_data.get('username', '').strip()
         if any(c.isdigit() for c in valor):
             raise forms.ValidationError('El usuario no puede contener números.')
+        qs = Usuario.objects.filter(username=valor)
+        if self.instance and self.instance.pk:
+            qs = qs.exclude(pk=self.instance.pk)
+        if qs.exists():
+            raise forms.ValidationError('Ya existe un usuario con ese nombre de usuario.')
         return valor
 
     def save(self, commit=True):

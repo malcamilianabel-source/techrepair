@@ -6,7 +6,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from .models import (Usuario, Cliente, Equipo, Solicitud, DetalleSolicitud,
                      HistorialEstado, Avance, Repuesto, Costo, AmpliacionTiempo)
-from .forms import (ClienteForm, EquipoForm, EquipoUpdateForm, SolicitudForm,
+from .forms import (ClienteForm, ClienteUpdateForm, EquipoForm, EquipoUpdateForm, SolicitudForm,
                     CambiarEstadoForm, AsignarTecnicoForm, UsuarioForm,
                     DiagnosticoForm, AvanceForm, NotaBitacoraForm, AmpliacionTiempoForm)
 
@@ -155,13 +155,13 @@ def registrar_cliente(request):
 def actualizar_cliente(request, pk):
     cliente = Cliente.objects.get(pk=pk)
     if request.method == 'POST':
-        form = ClienteForm(request.POST, instance=cliente)
+        form = ClienteUpdateForm(request.POST, instance=cliente)
         if form.is_valid():
             form.save()
             messages.success(request, 'Cliente actualizado correctamente.')
             return redirect('consultar_clientes')
     else:
-        form = ClienteForm(instance=cliente)
+        form = ClienteUpdateForm(instance=cliente)
     return render(request, 'core/clientes/actualizar.html', {
         'form':    form,
         'cliente': cliente,
