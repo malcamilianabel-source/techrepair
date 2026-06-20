@@ -267,6 +267,12 @@ class UsuarioForm(forms.ModelForm):
             raise forms.ValidationError('Ya existe un usuario con ese nombre de usuario.')
         return valor
 
+    def clean_password(self):
+        password = self.cleaned_data.get('password', '')
+        if len(password) < 8:
+            raise forms.ValidationError('La contraseña debe tener al menos 8 caracteres.')
+        return password
+
     def save(self, commit=True):
         user = super().save(commit=False)
         user.set_password(self.cleaned_data['password'])

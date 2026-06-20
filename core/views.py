@@ -153,7 +153,7 @@ def registrar_cliente(request):
 # ── ACTUALIZAR CLIENTE ─────────────────────────────────────────
 @login_required(login_url='login')
 def actualizar_cliente(request, pk):
-    cliente = Cliente.objects.get(pk=pk)
+    cliente = get_object_or_404(Cliente, pk=pk)
     if request.method == 'POST':
         form = ClienteUpdateForm(request.POST, instance=cliente)
         if form.is_valid():
@@ -424,9 +424,19 @@ def consultar_solicitudes(request):
 # ── DETALLE SOLICITUD ──────────────────────────────────────────
 @login_required(login_url='login')
 def detalle_solicitud(request, pk):
-    solicitud = Solicitud.objects.select_related(
-        'cliente', 'equipo', 'detalle__tecnico'
-    ).get(pk=pk)
+    solicitud = get_object_or_404(
+        Solicitud.objects.select_related('cliente', 'equipo', 'detalle__tecnico'),
+        pk=pk
+    )
+    # Técnicos solo pueden ver sus propias solicitudes
+    if request.user.rol == 'tec':
+        try:
+            asignado = solicitud.detalle.tecnico
+        except Exception:
+            asignado = None
+        if asignado != request.user:
+            messages.error(request, 'No tienes permiso para ver esta solicitud.')
+            return redirect('consultar_solicitudes')
     historial = solicitud.historial.select_related('usuario').all()
     avances   = solicitud.avances.select_related('usuario').all()
 
@@ -451,7 +461,7 @@ def detalle_solicitud(request, pk):
 def cambiar_estado(request, pk):
     if request.user.rol not in ['admin', 'tec']:
         return redirect('detalle_solicitud', pk=pk)
-    solicitud = Solicitud.objects.get(pk=pk)
+    solicitud = get_object_or_404(Solicitud, pk=pk)
 
     ESTADO_ORDEN = ['pendiente', 'proceso', 'finalizado', 'entregado']
     ESTADO_LABELS = {
@@ -474,6 +484,20 @@ def cambiar_estado(request, pk):
             if nuevo_estado not in estados_siguientes:
                 messages.error(request, 'Estado no válido.')
                 return redirect('detalle_solicitud', pk=pk)
+
+            # Verificar técnico asignado antes de pasar a proceso
+            if nuevo_estado == 'proceso':
+                tiene_tecnico = False
+                try:
+                    tiene_tecnico = solicitud.detalle.tecnico is not None
+                except Exception:
+                    tiene_tecnico = False
+                if not tiene_tecnico:
+                    messages.error(
+                        request,
+                        'Debes asignar un técnico antes de cambiar el estado a "En proceso".'
+                    )
+                    return redirect('detalle_solicitud', pk=pk)
 
             # Verificar costo antes de finalizar
             if nuevo_estado == 'finalizado':
@@ -527,7 +551,7 @@ def asignar_tecnico(request, pk):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('detalle_solicitud', pk=pk)
 
-    solicitud = Solicitud.objects.get(pk=pk)
+    solicitud = get_object_or_404(Solicitud, pk=pk)
 
     MAPA_TIPO_ESP = {
         'hardware':   'hardware',
@@ -747,7 +771,10 @@ def eliminar_usuario(request, pk):
     # ── DIAGNÓSTICO ────────────────────────────────────────────────
 @login_required(login_url='login')
 def diagnostico(request, pk):
-    solicitud = Solicitud.objects.get(pk=pk)
+    solicitud = get_object_or_404(Solicitud, pk=pk)
+    if solicitud.estado in ['finalizado', 'entregado']:
+        messages.error(request, 'No se puede editar el diagnóstico de una solicitud finalizada.')
+        return redirect('detalle_solicitud', pk=pk)
     detalle, _ = DetalleSolicitud.objects.get_or_create(solicitud=solicitud)
     if request.method == 'POST':
         form = DiagnosticoForm(request.POST, instance=detalle)
@@ -768,7 +795,10 @@ def avance(request, pk):
     ETAPA_ORDEN = ['diagnostico', 'desmontaje', 'reparacion', 'prueba', 'ensamblaje', 'prueba_final']
     ETAPA_LABELS = dict(Avance.ETAPAS)
 
-    solicitud = Solicitud.objects.get(pk=pk)
+    solicitud = get_object_or_404(Solicitud, pk=pk)
+    if solicitud.estado in ['finalizado', 'entregado']:
+        messages.error(request, 'No se pueden registrar avances en una solicitud finalizada.')
+        return redirect('detalle_solicitud', pk=pk)
     avances   = solicitud.avances.select_related('usuario').all()
 
     ultimo_avance = avances.last()
@@ -824,18 +854,30 @@ def avance(request, pk):
     # ── REPUESTOS ──────────────────────────────────────────────────
 @login_required(login_url='login')
 def repuestos(request, pk):
-    solicitud = Solicitud.objects.get(pk=pk)
+    solicitud = get_object_or_404(Solicitud, pk=pk)
     repuestos = solicitud.repuestos.all()
     if request.method == 'POST':
         nombre      = request.POST.get('nombre')
         cantidad    = request.POST.get('cantidad')
         precio_unit = request.POST.get('precio_unit')
         if nombre and cantidad and precio_unit:
+            try:
+                cantidad_int = int(cantidad)
+                precio_dec   = float(precio_unit)
+            except (ValueError, TypeError):
+                messages.error(request, 'Cantidad y precio deben ser valores numéricos válidos.')
+                return redirect('repuestos', pk=pk)
+            if cantidad_int <= 0:
+                messages.error(request, 'La cantidad debe ser mayor a cero.')
+                return redirect('repuestos', pk=pk)
+            if precio_dec < 0:
+                messages.error(request, 'El precio no puede ser negativo.')
+                return redirect('repuestos', pk=pk)
             Repuesto.objects.create(
                 solicitud   = solicitud,
                 nombre      = nombre,
-                cantidad    = int(cantidad),
-                precio_unit = precio_unit
+                cantidad    = cantidad_int,
+                precio_unit = precio_dec
             )
             # Actualizar costo total
             costo, _ = Costo.objects.get_or_create(solicitud=solicitud)
@@ -854,7 +896,7 @@ def repuestos(request, pk):
 # ── COSTOS ─────────────────────────────────────────────────────
 @login_required(login_url='login')
 def costos(request, pk):
-    solicitud    = Solicitud.objects.get(pk=pk)
+    solicitud    = get_object_or_404(Solicitud, pk=pk)
     repuestos    = solicitud.repuestos.all()
     costo, _     = Costo.objects.get_or_create(solicitud=solicitud)
     if request.method == 'POST':
@@ -1156,9 +1198,10 @@ def seguimiento(request, pk):
 # ── ENTREGA DE EQUIPO ──────────────────────────────────────────
 @login_required(login_url='login')
 def entrega(request, pk):
-    solicitud = Solicitud.objects.select_related(
-        'cliente', 'equipo', 'detalle__tecnico'
-    ).get(pk=pk)
+    solicitud = get_object_or_404(
+        Solicitud.objects.select_related('cliente', 'equipo', 'detalle__tecnico'),
+        pk=pk
+    )
     try:
         costo = solicitud.costo
     except:
@@ -1166,6 +1209,12 @@ def entrega(request, pk):
     repuestos = solicitud.repuestos.all()
 
     if request.method == 'POST':
+        if solicitud.estado == 'entregado':
+            messages.error(request, 'Esta solicitud ya fue entregada.')
+            return redirect('detalle_solicitud', pk=pk)
+        if solicitud.estado != 'finalizado':
+            messages.error(request, 'Solo se puede registrar la entrega de una solicitud finalizada.')
+            return redirect('detalle_solicitud', pk=pk)
         confirmacion = request.POST.get('confirmacion') == 'on'
         observaciones = request.POST.get('observaciones', '')
         solicitud.fecha_entrega         = datetime.date.today()
@@ -1204,9 +1253,10 @@ def informe_pdf(request, pk):
     from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
     import io
 
-    solicitud = Solicitud.objects.select_related(
-        'cliente', 'equipo', 'detalle__tecnico'
-    ).get(pk=pk)
+    solicitud = get_object_or_404(
+        Solicitud.objects.select_related('cliente', 'equipo', 'detalle__tecnico'),
+        pk=pk
+    )
 
     try:
         costo = solicitud.costo
@@ -1381,7 +1431,7 @@ def informe_pdf(request, pk):
 def eliminar_solicitud(request, pk):
     if request.user.rol != 'admin':
         return redirect('consultar_solicitudes')
-    solicitud = Solicitud.objects.get(pk=pk)
+    solicitud = get_object_or_404(Solicitud, pk=pk)
     if solicitud.estado != 'entregado':
         messages.error(request, 'Solo se pueden eliminar solicitudes entregadas.')
         return redirect('detalle_solicitud', pk=pk)
@@ -1396,7 +1446,7 @@ def eliminar_solicitud(request, pk):
 def marcar_prioritaria(request, pk):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('consultar_solicitudes')
-    solicitud = Solicitud.objects.get(pk=pk)
+    solicitud = get_object_or_404(Solicitud, pk=pk)
     solicitud.prioridad = 'alta'
     solicitud.save()
     messages.success(request, f'Solicitud #S-{pk} marcada como prioritaria.')
@@ -1406,7 +1456,7 @@ def marcar_prioritaria(request, pk):
 # ── REASIGNAR TÉCNICO ──────────────────────────────────────────
 @login_required(login_url='login')
 def reasignar_tecnico(request, pk):
-    solicitud = Solicitud.objects.get(pk=pk)
+    solicitud = get_object_or_404(Solicitud, pk=pk)
     detalle, _ = DetalleSolicitud.objects.get_or_create(solicitud=solicitud)
     tecnico_actual = detalle.tecnico
 
@@ -1467,7 +1517,7 @@ def historial_equipo(request, pk):
 def actualizar_equipo(request, pk):
     if request.user.rol == 'tec':
         return redirect('dashboard')
-    equipo = Equipo.objects.select_related('cliente').get(pk=pk)
+    equipo = get_object_or_404(Equipo.objects.select_related('cliente'), pk=pk)
     CAMPOS_IDENTIDAD = ['tipo', 'tipo_personalizado', 'marca', 'marca_personalizada', 'modelo', 'serie']
     if request.method == 'POST':
         form = EquipoUpdateForm(request.POST, instance=equipo)
@@ -1491,10 +1541,10 @@ def eliminar_cliente(request, pk):
     if request.user.rol != 'admin':
         messages.error(request, 'Solo el administrador puede eliminar clientes.')
         return redirect('consultar_clientes')
-    cliente = Cliente.objects.get(pk=pk)
+    cliente = get_object_or_404(Cliente, pk=pk)
     if request.method == 'POST':
         try:
-            
+
             nombre = cliente.nombre_completo
             cliente.delete()
             messages.success(request, f'Cliente {nombre} eliminado correctamente.')
@@ -1513,10 +1563,10 @@ def eliminar_equipo(request, pk):
     if request.user.rol != 'admin':
         messages.error(request, 'Solo el administrador puede eliminar equipos.')
         return redirect('consultar_equipos')
-    equipo = Equipo.objects.select_related('cliente').get(pk=pk)
+    equipo = get_object_or_404(Equipo.objects.select_related('cliente'), pk=pk)
     if request.method == 'POST':
         try:
-            
+
             desc = f'{equipo.get_marca_display()} {equipo.modelo}'
             equipo.delete()
             messages.success(request, f'Equipo {desc} eliminado correctamente.')
@@ -1532,7 +1582,7 @@ def eliminar_equipo(request, pk):
 @login_required(login_url='login')
 def solicitar_ampliacion(request, pk):
     from decimal import Decimal
-    solicitud = Solicitud.objects.get(pk=pk)
+    solicitud = get_object_or_404(Solicitud, pk=pk)
 
     if request.user.rol == 'tec':
         try:
