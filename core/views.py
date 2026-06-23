@@ -391,6 +391,8 @@ def registrar_solicitud(request):
 # ── CONSULTAR SOLICITUDES ──────────────────────────────────────
 @login_required(login_url='login')
 def consultar_solicitudes(request):
+    from django.db.models import Case, When, IntegerField
+
     estado   = request.GET.get('estado', '')
     tecnico  = request.GET.get('tecnico', '')
     prioridad= request.GET.get('prioridad', '')
@@ -398,7 +400,15 @@ def consultar_solicitudes(request):
 
     solicitudes = Solicitud.objects.select_related(
         'cliente', 'equipo', 'detalle__tecnico'
-    ).order_by('-creado_en')
+    ).annotate(
+        orden_prioridad=Case(
+            When(prioridad='alta',  then=0),
+            When(prioridad='media', then=1),
+            When(prioridad='baja',  then=2),
+            default=3,
+            output_field=IntegerField(),
+        )
+    ).order_by('orden_prioridad', '-creado_en')
 
     if request.user.rol == 'tec':
         solicitudes = solicitudes.filter(detalle__tecnico=request.user)
@@ -925,21 +935,50 @@ def reporte_solicitudes(request):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('dashboard')
 
-    total   = Solicitud.objects.count()
+    import json
+    from django.db.models import Count
+
+    # ── Filtros de fecha ──
+    fecha_inicio_str = request.GET.get('fecha_inicio', '')
+    fecha_fin_str    = request.GET.get('fecha_fin', '')
+    fecha_inicio = fecha_fin = None
+    error_fecha = ''
+
+    if fecha_inicio_str:
+        try:
+            fecha_inicio = datetime.date.fromisoformat(fecha_inicio_str)
+        except ValueError:
+            error_fecha = 'Formato de fecha inválido.'
+    if fecha_fin_str:
+        try:
+            fecha_fin = datetime.date.fromisoformat(fecha_fin_str)
+        except ValueError:
+            error_fecha = 'Formato de fecha inválido.'
+    if fecha_inicio and fecha_fin and fecha_inicio > fecha_fin:
+        error_fecha = 'La fecha de inicio no puede ser posterior a la fecha de fin.'
+        fecha_inicio = fecha_fin = None
+
+    qs = Solicitud.objects.all()
+    if fecha_inicio:
+        qs = qs.filter(fecha_ingreso__gte=fecha_inicio)
+    if fecha_fin:
+        qs = qs.filter(fecha_ingreso__lte=fecha_fin)
+
+    total   = qs.count()
     estados = {
-        'pendiente':  Solicitud.objects.filter(estado='pendiente').count(),
-        'proceso':    Solicitud.objects.filter(estado='proceso').count(),
-        'finalizado': Solicitud.objects.filter(estado='finalizado').count(),
-        'entregado':  Solicitud.objects.filter(estado='entregado').count(),
+        'pendiente':  qs.filter(estado='pendiente').count(),
+        'proceso':    qs.filter(estado='proceso').count(),
+        'finalizado': qs.filter(estado='finalizado').count(),
+        'entregado':  qs.filter(estado='entregado').count(),
     }
 
     tipos = {}
     for t, label in Solicitud.TIPOS_REP:
-        tipos[label] = Solicitud.objects.filter(tipo_reparacion=t).count()
+        tipos[label] = qs.filter(tipo_reparacion=t).count()
 
     por_tecnico = []
     for tec in Usuario.objects.filter(rol='tec'):
-        cant = DetalleSolicitud.objects.filter(tecnico=tec).count()
+        cant = DetalleSolicitud.objects.filter(tecnico=tec, solicitud__in=qs).count()
         por_tecnico.append({
             'nombre':   tec.get_full_name() or tec.username,
             'cantidad': cant,
@@ -955,42 +994,38 @@ def reporte_solicitudes(request):
         while month <= 0:
             month += 12
             year  -= 1
-        count = Solicitud.objects.filter(
-            fecha_ingreso__year=year,
-            fecha_ingreso__month=month
-        ).count()
+        count = qs.filter(fecha_ingreso__year=year, fecha_ingreso__month=month).count()
         meses_labels.append(datetime.date(year, month, 1).strftime('%b %Y'))
         meses_data.append(count)
 
     # Marca más reparada
-    from django.db.models import Count
     marca_top = (Equipo.objects
-                 .filter(solicitudes__isnull=False)
+                 .filter(solicitudes__in=qs)
                  .values('marca')
                  .annotate(total=Count('solicitudes'))
                  .order_by('-total')
                  .first())
 
-    # Tasa de resolución
     resueltas = estados['finalizado'] + estados['entregado']
     tasa = round((resueltas / total * 100), 1) if total else 0
 
-    recientes = Solicitud.objects.select_related(
-        'cliente', 'equipo', 'detalle__tecnico'
-    ).order_by('-creado_en')[:10]
+    recientes = qs.select_related('cliente', 'equipo', 'detalle__tecnico').order_by('-creado_en')[:10]
 
-    import json
     return render(request, 'core/reportes/solicitudes.html', {
-        'total':         total,
-        'estados':       estados,
-        'tipos':         tipos,
-        'por_tecnico':   por_tecnico,
-        'recientes':     recientes,
-        'meses_labels':  json.dumps(meses_labels),
-        'meses_data':    json.dumps(meses_data),
-        'marca_top':     marca_top,
-        'tasa':          tasa,
-        'resueltas':     resueltas,
+        'total':             total,
+        'estados':           estados,
+        'tipos':             tipos,
+        'por_tecnico':       por_tecnico,
+        'recientes':         recientes,
+        'meses_labels':      json.dumps(meses_labels),
+        'meses_data':        json.dumps(meses_data),
+        'marca_top':         marca_top,
+        'tasa':              tasa,
+        'resueltas':         resueltas,
+        'fecha_inicio_str':  fecha_inicio_str,
+        'fecha_fin_str':     fecha_fin_str,
+        'error_fecha':       error_fecha,
+        'sin_datos':         total == 0 and (fecha_inicio or fecha_fin),
     })
 
 
@@ -1001,28 +1036,48 @@ def reporte_tiempos(request):
         return redirect('dashboard')
 
     import json
-    from decimal import Decimal
     from django.db.models import Avg, Sum
+
+    # ── Filtros de fecha ──
+    fecha_inicio_str = request.GET.get('fecha_inicio', '')
+    fecha_fin_str    = request.GET.get('fecha_fin', '')
+    fecha_inicio = fecha_fin = None
+    error_fecha = ''
+
+    if fecha_inicio_str:
+        try:
+            fecha_inicio = datetime.date.fromisoformat(fecha_inicio_str)
+        except ValueError:
+            error_fecha = 'Formato de fecha inválido.'
+    if fecha_fin_str:
+        try:
+            fecha_fin = datetime.date.fromisoformat(fecha_fin_str)
+        except ValueError:
+            error_fecha = 'Formato de fecha inválido.'
+    if fecha_inicio and fecha_fin and fecha_inicio > fecha_fin:
+        error_fecha = 'La fecha de inicio no puede ser posterior a la fecha de fin.'
+        fecha_inicio = fecha_fin = None
+
+    qs = Solicitud.objects.all()
+    if fecha_inicio:
+        qs = qs.filter(fecha_ingreso__gte=fecha_inicio)
+    if fecha_fin:
+        qs = qs.filter(fecha_ingreso__lte=fecha_fin)
 
     tiempos_por_tipo = {}
     for t, label in Solicitud.TIPOS_REP:
-        sols = Solicitud.objects.filter(tipo_reparacion=t)
-        sols_con_tiempo = sols.filter(tiempo_estimado_horas__isnull=False)
-        agg = sols_con_tiempo.aggregate(
+        sols = qs.filter(tipo_reparacion=t)
+        agg = sols.filter(tiempo_estimado_horas__isnull=False).aggregate(
             total=Sum('tiempo_estimado_horas'),
             promedio=Avg('tiempo_estimado_horas')
         )
-        total_horas = float(agg['total'] or 0)
-        promedio    = round(float(agg['promedio'] or 0), 1)
         tiempos_por_tipo[label] = {
             'cantidad':    sols.count(),
-            'promedio':    promedio,
-            'total_horas': round(total_horas, 1),
+            'promedio':    round(float(agg['promedio'] or 0), 1),
+            'total_horas': round(float(agg['total'] or 0), 1),
         }
 
-    agg_general = Solicitud.objects.filter(
-        tiempo_estimado_horas__isnull=False
-    ).aggregate(
+    agg_general = qs.filter(tiempo_estimado_horas__isnull=False).aggregate(
         total=Sum('tiempo_estimado_horas'),
         promedio=Avg('tiempo_estimado_horas')
     )
@@ -1033,31 +1088,30 @@ def reporte_tiempos(request):
     tipo_rapido = min(tipos_con_datos.items(), key=lambda x: x[1]['promedio'])[0] if tipos_con_datos else '—'
     tipo_lento  = max(tipos_con_datos.items(), key=lambda x: x[1]['promedio'])[0] if tipos_con_datos else '—'
 
-    chart_labels    = json.dumps(list(tiempos_por_tipo.keys()))
-    chart_promedios = json.dumps([v['promedio']    for v in tiempos_por_tipo.values()])
-    chart_totales   = json.dumps([v['total_horas'] for v in tiempos_por_tipo.values()])
-    chart_cantidad  = json.dumps([v['cantidad']    for v in tiempos_por_tipo.values()])
-
     tiempos_prioridad = {}
     for p, label in Solicitud.PRIORIDADES:
-        agg_p = Solicitud.objects.filter(
-            prioridad=p, tiempo_estimado_horas__isnull=False
-        ).aggregate(promedio=Avg('tiempo_estimado_horas'))
+        agg_p = qs.filter(prioridad=p, tiempo_estimado_horas__isnull=False).aggregate(
+            promedio=Avg('tiempo_estimado_horas')
+        )
         tiempos_prioridad[label] = round(float(agg_p['promedio'] or 0), 1)
 
     return render(request, 'core/reportes/tiempos.html', {
         'tiempos_por_tipo':  tiempos_por_tipo,
         'promedio_general':  promedio_general,
-        'total_solicitudes': Solicitud.objects.count(),
+        'total_solicitudes': qs.count(),
         'total_horas_acum':  total_horas_acum,
         'tipo_rapido':       tipo_rapido,
         'tipo_lento':        tipo_lento,
-        'chart_labels':      chart_labels,
-        'chart_promedios':   chart_promedios,
-        'chart_totales':     chart_totales,
-        'chart_cantidad':    chart_cantidad,
+        'chart_labels':      json.dumps(list(tiempos_por_tipo.keys())),
+        'chart_promedios':   json.dumps([v['promedio']    for v in tiempos_por_tipo.values()]),
+        'chart_totales':     json.dumps([v['total_horas'] for v in tiempos_por_tipo.values()]),
+        'chart_cantidad':    json.dumps([v['cantidad']    for v in tiempos_por_tipo.values()]),
         'tiempos_prioridad': json.dumps(tiempos_prioridad),
         'prioridad_labels':  json.dumps(list(tiempos_prioridad.keys())),
+        'fecha_inicio_str':  fecha_inicio_str,
+        'fecha_fin_str':     fecha_fin_str,
+        'error_fecha':       error_fecha,
+        'sin_datos':         qs.count() == 0 and (fecha_inicio or fecha_fin),
     })
 
 # ── REPORTE INGRESOS ───────────────────────────────────────────
@@ -1067,71 +1121,443 @@ def reporte_ingresos(request):
         return redirect('dashboard')
 
     import json
-    from django.db.models import Sum
 
-    costos = Costo.objects.select_related('solicitud__cliente').all()
-    total_ingresos  = sum(c.total     for c in costos)
-    total_mano_obra = sum(c.mano_obra for c in costos)
+    # ── Filtros de fecha ──
+    fecha_inicio_str = request.GET.get('fecha_inicio', '')
+    fecha_fin_str    = request.GET.get('fecha_fin', '')
+    fecha_inicio = fecha_fin = None
+    error_fecha = ''
+
+    if fecha_inicio_str:
+        try:
+            fecha_inicio = datetime.date.fromisoformat(fecha_inicio_str)
+        except ValueError:
+            error_fecha = 'Formato de fecha inválido.'
+    if fecha_fin_str:
+        try:
+            fecha_fin = datetime.date.fromisoformat(fecha_fin_str)
+        except ValueError:
+            error_fecha = 'Formato de fecha inválido.'
+    if fecha_inicio and fecha_fin and fecha_inicio > fecha_fin:
+        error_fecha = 'La fecha de inicio no puede ser posterior a la fecha de fin.'
+        fecha_inicio = fecha_fin = None
+
+    costos_qs = Costo.objects.select_related('solicitud__cliente', 'solicitud__equipo').all()
+    if fecha_inicio:
+        costos_qs = costos_qs.filter(solicitud__fecha_ingreso__gte=fecha_inicio)
+    if fecha_fin:
+        costos_qs = costos_qs.filter(solicitud__fecha_ingreso__lte=fecha_fin)
+
+    total_ingresos  = sum(c.total     for c in costos_qs)
+    total_mano_obra = sum(c.mano_obra for c in costos_qs)
     total_repuestos = total_ingresos - total_mano_obra
-    ticket_promedio = round(total_ingresos / costos.count(), 2) if costos.count() else 0
+    ticket_promedio = round(total_ingresos / costos_qs.count(), 2) if costos_qs.count() else 0
 
     # Ingresos por mes — últimos 6 meses
     hoy = datetime.date.today()
-    meses_labels  = []
+    meses_labels   = []
     meses_ingresos = []
-    meses_mano    = []
+    meses_mano     = []
     for i in range(5, -1, -1):
         year  = hoy.year
         month = hoy.month - i
         while month <= 0:
             month += 12; year -= 1
-        sols_mes = Costo.objects.filter(
+        sols_mes = costos_qs.filter(
             solicitud__fecha_ingreso__year=year,
             solicitud__fecha_ingreso__month=month
         )
-        ing = sum(c.total     for c in sols_mes)
-        man = sum(c.mano_obra for c in sols_mes)
         meses_labels.append(datetime.date(year, month, 1).strftime('%b %Y'))
-        meses_ingresos.append(float(ing))
-        meses_mano.append(float(man))
+        meses_ingresos.append(float(sum(c.total     for c in sols_mes)))
+        meses_mano.append(float(sum(c.mano_obra for c in sols_mes)))
 
     # Ingresos por tipo de reparación
     ingresos_tipo = {}
     for t, label in Solicitud.TIPOS_REP:
-        sols_tipo = Costo.objects.filter(solicitud__tipo_reparacion=t)
-        ingresos_tipo[label] = float(sum(c.total for c in sols_tipo))
+        ingresos_tipo[label] = float(sum(c.total for c in costos_qs.filter(solicitud__tipo_reparacion=t)))
 
-    # Técnico con más ingresos generados
+    # Ingresos por técnico
     tec_ingresos = []
     for tec in Usuario.objects.filter(rol='tec'):
-        ing = sum(
-            c.total for c in Costo.objects.filter(
-                solicitud__detalle__tecnico=tec
-            )
-        )
+        ing = sum(c.total for c in costos_qs.filter(solicitud__detalle__tecnico=tec))
         tec_ingresos.append({'nombre': tec.get_full_name() or tec.username, 'total': float(ing)})
     tec_ingresos.sort(key=lambda x: x['total'], reverse=True)
 
-    ultimos = Costo.objects.select_related(
-        'solicitud__cliente', 'solicitud__equipo'
-    ).order_by('-solicitud__creado_en')[:10]
+    ultimos = costos_qs.order_by('-solicitud__creado_en')[:10]
 
     return render(request, 'core/reportes/ingresos.html', {
-        'total_ingresos':   total_ingresos,
-        'total_mano_obra':  total_mano_obra,
-        'total_repuestos':  total_repuestos,
-        'ticket_promedio':  ticket_promedio,
-        'total_registros':  costos.count(),
-        'ultimos':          ultimos,
-        'tec_ingresos':     tec_ingresos,
-        'meses_labels':     json.dumps(meses_labels),
-        'meses_ingresos':   json.dumps(meses_ingresos),
-        'meses_mano':       json.dumps(meses_mano),
+        'total_ingresos':       total_ingresos,
+        'total_mano_obra':      total_mano_obra,
+        'total_repuestos':      total_repuestos,
+        'ticket_promedio':      ticket_promedio,
+        'total_registros':      costos_qs.count(),
+        'ultimos':              ultimos,
+        'tec_ingresos':         tec_ingresos,
+        'meses_labels':         json.dumps(meses_labels),
+        'meses_ingresos':       json.dumps(meses_ingresos),
+        'meses_mano':           json.dumps(meses_mano),
         'ingresos_tipo_labels': json.dumps(list(ingresos_tipo.keys())),
         'ingresos_tipo_data':   json.dumps(list(ingresos_tipo.values())),
-        'tec_labels': json.dumps([t['nombre'] for t in tec_ingresos]),
-        'tec_data':   json.dumps([t['total']  for t in tec_ingresos]),
+        'tec_labels':           json.dumps([t['nombre'] for t in tec_ingresos]),
+        'tec_data':             json.dumps([t['total']  for t in tec_ingresos]),
+        'fecha_inicio_str':     fecha_inicio_str,
+        'fecha_fin_str':        fecha_fin_str,
+        'error_fecha':          error_fecha,
+        'sin_datos':            costos_qs.count() == 0 and (fecha_inicio or fecha_fin),
     })
+
+    # ── PDF REPORTE SOLICITUDES ────────────────────────────────────
+@login_required(login_url='login')
+def reporte_solicitudes_pdf(request):
+    if request.user.rol not in ['admin', 'recep']:
+        return redirect('dashboard')
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+    from django.http import HttpResponse
+    from django.db.models import Count
+    import io
+
+    fecha_inicio_str = request.GET.get('fecha_inicio', '')
+    fecha_fin_str    = request.GET.get('fecha_fin', '')
+    fecha_inicio = fecha_fin = None
+    if fecha_inicio_str:
+        try: fecha_inicio = datetime.date.fromisoformat(fecha_inicio_str)
+        except ValueError: pass
+    if fecha_fin_str:
+        try: fecha_fin = datetime.date.fromisoformat(fecha_fin_str)
+        except ValueError: pass
+
+    qs = Solicitud.objects.all()
+    if fecha_inicio: qs = qs.filter(fecha_ingreso__gte=fecha_inicio)
+    if fecha_fin:    qs = qs.filter(fecha_ingreso__lte=fecha_fin)
+
+    total = qs.count()
+    estados = {
+        'Pendiente':  qs.filter(estado='pendiente').count(),
+        'En proceso': qs.filter(estado='proceso').count(),
+        'Finalizado': qs.filter(estado='finalizado').count(),
+        'Entregado':  qs.filter(estado='entregado').count(),
+    }
+    tipos = {label: qs.filter(tipo_reparacion=t).count() for t, label in Solicitud.TIPOS_REP}
+    por_tecnico = [
+        (tec.get_full_name() or tec.username,
+         DetalleSolicitud.objects.filter(tecnico=tec, solicitud__in=qs).count())
+        for tec in Usuario.objects.filter(rol='tec')
+    ]
+    resueltas = estados['Finalizado'] + estados['Entregado']
+    tasa = round((resueltas / total * 100), 1) if total else 0
+
+    AZUL = colors.HexColor('#1F3864')
+    LIGHT = colors.HexColor('#EBF3FB')
+    GRIS  = colors.HexColor('#f5f5f5')
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=2*cm, leftMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+    styles = getSampleStyleSheet()
+    titulo_s  = ParagraphStyle('t', fontSize=16, textColor=AZUL, fontName='Helvetica-Bold')
+    subtit_s  = ParagraphStyle('s', fontSize=9,  textColor=colors.grey, fontName='Helvetica')
+    seccion_s = ParagraphStyle('sec', fontSize=8, textColor=colors.grey,
+                               fontName='Helvetica-Bold', spaceAfter=4)
+    W = 17*cm
+
+    def tabla(data, col_widths, header=True):
+        t = Table(data, colWidths=col_widths)
+        style = [
+            ('FONTNAME',  (0,0), (-1,0 if header else -1), 'Helvetica-Bold'),
+            ('FONTSIZE',  (0,0), (-1,-1), 8),
+            ('BACKGROUND',(0,0), (-1,0), AZUL if header else GRIS),
+            ('TEXTCOLOR', (0,0), (-1,0), colors.white if header else colors.black),
+            ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.white, GRIS]),
+            ('GRID',      (0,0), (-1,-1), 0.4, colors.HexColor('#CCCCCC')),
+            ('ALIGN',     (0,0), (-1,-1), 'LEFT'),
+            ('VALIGN',    (0,0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING',(0,0), (-1,-1), 4),
+            ('BOTTOMPADDING',(0,0), (-1,-1), 4),
+        ]
+        t.setStyle(TableStyle(style))
+        return t
+
+    periodo = ''
+    if fecha_inicio and fecha_fin:
+        periodo = f' | Período: {fecha_inicio.strftime("%d/%m/%Y")} — {fecha_fin.strftime("%d/%m/%Y")}'
+    elif fecha_inicio:
+        periodo = f' | Desde: {fecha_inicio.strftime("%d/%m/%Y")}'
+    elif fecha_fin:
+        periodo = f' | Hasta: {fecha_fin.strftime("%d/%m/%Y")}'
+
+    story = [
+        Paragraph('TechRepair — Reporte de Solicitudes', titulo_s),
+        Paragraph(f'Generado el {datetime.date.today().strftime("%d/%m/%Y")}{periodo}', subtit_s),
+        Spacer(1, 0.4*cm),
+        Paragraph('RESUMEN GENERAL', seccion_s),
+        tabla([['Total solicitudes', 'Resueltas', 'Tasa de resolución'],
+               [total, resueltas, f'{tasa}%']], [W/3]*3),
+        Spacer(1, 0.3*cm),
+        Paragraph('POR ESTADO', seccion_s),
+        tabla([['Estado', 'Cantidad']] + list(estados.items()), [W*0.6, W*0.4]),
+        Spacer(1, 0.3*cm),
+        Paragraph('POR TIPO DE REPARACIÓN', seccion_s),
+        tabla([['Tipo', 'Cantidad']] + list(tipos.items()), [W*0.6, W*0.4]),
+    ]
+    if por_tecnico:
+        story += [
+            Spacer(1, 0.3*cm),
+            Paragraph('POR TÉCNICO', seccion_s),
+            tabla([['Técnico', 'Solicitudes']] + por_tecnico, [W*0.6, W*0.4]),
+        ]
+
+    if total == 0:
+        story.append(Spacer(1, 0.3*cm))
+        story.append(Paragraph('No hay solicitudes en el período seleccionado.', subtit_s))
+
+    doc.build(story)
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename="reporte_solicitudes.pdf"'
+    return response
+
+
+# ── PDF REPORTE TIEMPOS ────────────────────────────────────────
+@login_required(login_url='login')
+def reporte_tiempos_pdf(request):
+    if request.user.rol not in ['admin', 'recep']:
+        return redirect('dashboard')
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from django.http import HttpResponse
+    from django.db.models import Avg, Sum
+    import io
+
+    fecha_inicio_str = request.GET.get('fecha_inicio', '')
+    fecha_fin_str    = request.GET.get('fecha_fin', '')
+    fecha_inicio = fecha_fin = None
+    if fecha_inicio_str:
+        try: fecha_inicio = datetime.date.fromisoformat(fecha_inicio_str)
+        except ValueError: pass
+    if fecha_fin_str:
+        try: fecha_fin = datetime.date.fromisoformat(fecha_fin_str)
+        except ValueError: pass
+
+    qs = Solicitud.objects.all()
+    if fecha_inicio: qs = qs.filter(fecha_ingreso__gte=fecha_inicio)
+    if fecha_fin:    qs = qs.filter(fecha_ingreso__lte=fecha_fin)
+
+    tiempos_por_tipo = {}
+    for t, label in Solicitud.TIPOS_REP:
+        sols = qs.filter(tipo_reparacion=t)
+        agg = sols.filter(tiempo_estimado_horas__isnull=False).aggregate(
+            total=Sum('tiempo_estimado_horas'), promedio=Avg('tiempo_estimado_horas'))
+        tiempos_por_tipo[label] = {
+            'cantidad':    sols.count(),
+            'promedio':    round(float(agg['promedio'] or 0), 1),
+            'total_horas': round(float(agg['total'] or 0), 1),
+        }
+
+    agg_gen = qs.filter(tiempo_estimado_horas__isnull=False).aggregate(
+        total=Sum('tiempo_estimado_horas'), promedio=Avg('tiempo_estimado_horas'))
+    promedio_general = round(float(agg_gen['promedio'] or 0), 1)
+    total_horas_acum = round(float(agg_gen['total'] or 0), 1)
+
+    AZUL = colors.HexColor('#1F3864')
+    GRIS = colors.HexColor('#f5f5f5')
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=2*cm, leftMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+    titulo_s  = ParagraphStyle('t', fontSize=16, textColor=AZUL, fontName='Helvetica-Bold')
+    subtit_s  = ParagraphStyle('s', fontSize=9,  textColor=colors.grey, fontName='Helvetica')
+    seccion_s = ParagraphStyle('sec', fontSize=8, textColor=colors.grey,
+                               fontName='Helvetica-Bold', spaceAfter=4)
+    W = 17*cm
+
+    def tabla(data, col_widths):
+        t = Table(data, colWidths=col_widths)
+        t.setStyle(TableStyle([
+            ('FONTNAME',     (0,0), (-1,0),  'Helvetica-Bold'),
+            ('FONTSIZE',     (0,0), (-1,-1), 8),
+            ('BACKGROUND',   (0,0), (-1,0),  AZUL),
+            ('TEXTCOLOR',    (0,0), (-1,0),  colors.white),
+            ('ROWBACKGROUNDS',(0,1),(-1,-1), [colors.white, GRIS]),
+            ('GRID',         (0,0), (-1,-1), 0.4, colors.HexColor('#CCCCCC')),
+            ('ALIGN',        (1,0), (-1,-1), 'CENTER'),
+            ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING',   (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING',(0,0), (-1,-1), 4),
+        ]))
+        return t
+
+    periodo = ''
+    if fecha_inicio and fecha_fin:
+        periodo = f' | Período: {fecha_inicio.strftime("%d/%m/%Y")} — {fecha_fin.strftime("%d/%m/%Y")}'
+    elif fecha_inicio:
+        periodo = f' | Desde: {fecha_inicio.strftime("%d/%m/%Y")}'
+    elif fecha_fin:
+        periodo = f' | Hasta: {fecha_fin.strftime("%d/%m/%Y")}'
+
+    rows = [['Tipo de reparación', 'Solicitudes', 'Prom. horas', 'Total horas']]
+    for label, v in tiempos_por_tipo.items():
+        rows.append([label, v['cantidad'], f"{v['promedio']}h", f"{v['total_horas']}h"])
+
+    story = [
+        Paragraph('TechRepair — Reporte de Tiempos de Reparación', titulo_s),
+        Paragraph(f'Generado el {datetime.date.today().strftime("%d/%m/%Y")}{periodo}', subtit_s),
+        Spacer(1, 0.4*cm),
+        Paragraph('RESUMEN GENERAL', seccion_s),
+        tabla([['Total solicitudes', 'Promedio general', 'Total horas acum.'],
+               [qs.count(), f'{promedio_general}h', f'{total_horas_acum}h']], [W/3]*3),
+        Spacer(1, 0.3*cm),
+        Paragraph('TIEMPOS POR TIPO DE REPARACIÓN', seccion_s),
+        tabla(rows, [W*0.4, W*0.2, W*0.2, W*0.2]),
+    ]
+
+    if qs.count() == 0:
+        story.append(Spacer(1, 0.3*cm))
+        story.append(Paragraph('Sin datos finalizados en el período.', subtit_s))
+
+    doc.build(story)
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename="reporte_tiempos.pdf"'
+    return response
+
+
+# ── PDF REPORTE INGRESOS ───────────────────────────────────────
+@login_required(login_url='login')
+def reporte_ingresos_pdf(request):
+    if request.user.rol != 'admin':
+        return redirect('dashboard')
+
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from django.http import HttpResponse
+    import io
+
+    fecha_inicio_str = request.GET.get('fecha_inicio', '')
+    fecha_fin_str    = request.GET.get('fecha_fin', '')
+    fecha_inicio = fecha_fin = None
+    if fecha_inicio_str:
+        try: fecha_inicio = datetime.date.fromisoformat(fecha_inicio_str)
+        except ValueError: pass
+    if fecha_fin_str:
+        try: fecha_fin = datetime.date.fromisoformat(fecha_fin_str)
+        except ValueError: pass
+
+    costos_qs = Costo.objects.select_related(
+        'solicitud__cliente', 'solicitud__equipo', 'solicitud__detalle__tecnico'
+    ).all()
+    if fecha_inicio: costos_qs = costos_qs.filter(solicitud__fecha_ingreso__gte=fecha_inicio)
+    if fecha_fin:    costos_qs = costos_qs.filter(solicitud__fecha_ingreso__lte=fecha_fin)
+
+    total_ingresos  = sum(c.total     for c in costos_qs)
+    total_mano_obra = sum(c.mano_obra for c in costos_qs)
+    total_repuestos = total_ingresos - total_mano_obra
+    ticket_promedio = round(total_ingresos / costos_qs.count(), 2) if costos_qs.count() else 0
+
+    ingresos_tipo = {
+        label: float(sum(c.total for c in costos_qs.filter(solicitud__tipo_reparacion=t)))
+        for t, label in Solicitud.TIPOS_REP
+    }
+    tec_ingresos = sorted([
+        (tec.get_full_name() or tec.username,
+         float(sum(c.total for c in costos_qs.filter(solicitud__detalle__tecnico=tec))))
+        for tec in Usuario.objects.filter(rol='tec')
+    ], key=lambda x: x[1], reverse=True)
+
+    AZUL  = colors.HexColor('#1F3864')
+    GRIS  = colors.HexColor('#f5f5f5')
+    LIGHT = colors.HexColor('#EBF3FB')
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=A4,
+                            rightMargin=2*cm, leftMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+    titulo_s  = ParagraphStyle('t', fontSize=16, textColor=AZUL, fontName='Helvetica-Bold')
+    subtit_s  = ParagraphStyle('s', fontSize=9,  textColor=colors.grey, fontName='Helvetica')
+    seccion_s = ParagraphStyle('sec', fontSize=8, textColor=colors.grey,
+                               fontName='Helvetica-Bold', spaceAfter=4)
+    W = 17*cm
+
+    def tabla(data, col_widths, align_right_cols=None):
+        t = Table(data, colWidths=col_widths)
+        style = [
+            ('FONTNAME',     (0,0), (-1,0),  'Helvetica-Bold'),
+            ('FONTSIZE',     (0,0), (-1,-1), 8),
+            ('BACKGROUND',   (0,0), (-1,0),  AZUL),
+            ('TEXTCOLOR',    (0,0), (-1,0),  colors.white),
+            ('ROWBACKGROUNDS',(0,1),(-1,-1), [colors.white, GRIS]),
+            ('GRID',         (0,0), (-1,-1), 0.4, colors.HexColor('#CCCCCC')),
+            ('VALIGN',       (0,0), (-1,-1), 'MIDDLE'),
+            ('TOPPADDING',   (0,0), (-1,-1), 4),
+            ('BOTTOMPADDING',(0,0), (-1,-1), 4),
+        ]
+        if align_right_cols:
+            for col in align_right_cols:
+                style.append(('ALIGN', (col,0), (col,-1), 'RIGHT'))
+        t.setStyle(TableStyle(style))
+        return t
+
+    periodo = ''
+    if fecha_inicio and fecha_fin:
+        periodo = f' | Período: {fecha_inicio.strftime("%d/%m/%Y")} — {fecha_fin.strftime("%d/%m/%Y")}'
+    elif fecha_inicio:
+        periodo = f' | Desde: {fecha_inicio.strftime("%d/%m/%Y")}'
+    elif fecha_fin:
+        periodo = f' | Hasta: {fecha_fin.strftime("%d/%m/%Y")}'
+
+    story = [
+        Paragraph('TechRepair — Reporte de Ingresos', titulo_s),
+        Paragraph(f'Generado el {datetime.date.today().strftime("%d/%m/%Y")}{periodo}', subtit_s),
+        Spacer(1, 0.4*cm),
+        Paragraph('RESUMEN DE INGRESOS', seccion_s),
+        tabla([
+            ['Total ingresos', 'Mano de obra', 'Repuestos', 'Ticket promedio'],
+            [f'S/ {total_ingresos:.2f}', f'S/ {total_mano_obra:.2f}',
+             f'S/ {total_repuestos:.2f}', f'S/ {ticket_promedio:.2f}'],
+        ], [W/4]*4, align_right_cols=[0,1,2,3]),
+        Spacer(1, 0.3*cm),
+        Paragraph('INGRESOS POR TIPO DE REPARACIÓN', seccion_s),
+        tabla(
+            [['Tipo', 'Total (S/)']] + [[k, f'S/ {v:.2f}'] for k,v in ingresos_tipo.items()],
+            [W*0.6, W*0.4], align_right_cols=[1]
+        ),
+    ]
+
+    if tec_ingresos:
+        story += [
+            Spacer(1, 0.3*cm),
+            Paragraph('INGRESOS POR TÉCNICO', seccion_s),
+            tabla(
+                [['Técnico', 'Total generado (S/)']] +
+                [[n, f'S/ {v:.2f}'] for n,v in tec_ingresos],
+                [W*0.6, W*0.4], align_right_cols=[1]
+            ),
+        ]
+
+    if costos_qs.count() == 0:
+        story.append(Spacer(1, 0.3*cm))
+        story.append(Paragraph('Sin ingresos en el período seleccionado.', subtit_s))
+
+    doc.build(story)
+    buffer.seek(0)
+    response = HttpResponse(buffer, content_type='application/pdf')
+    response['Content-Disposition'] = 'inline; filename="reporte_ingresos.pdf"'
+    return response
+
 
     # ── API: EQUIPOS POR CLIENTE ───────────────────────────────────
 from django.http import JsonResponse
@@ -1447,9 +1873,26 @@ def marcar_prioritaria(request, pk):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('consultar_solicitudes')
     solicitud = get_object_or_404(Solicitud, pk=pk)
-    solicitud.prioridad = 'alta'
+    if solicitud.prioridad != 'alta':
+        solicitud.prioridad_anterior = solicitud.prioridad
+    solicitud.prioridad      = 'alta'
+    solicitud.es_prioritaria = True
     solicitud.save()
     messages.success(request, f'Solicitud #S-{pk} marcada como prioritaria.')
+    return redirect('consultar_solicitudes')
+
+
+# ── QUITAR PRIORIDAD ───────────────────────────────────────────
+@login_required(login_url='login')
+def quitar_prioritaria(request, pk):
+    if request.user.rol not in ['admin', 'recep']:
+        return redirect('consultar_solicitudes')
+    solicitud = get_object_or_404(Solicitud, pk=pk)
+    solicitud.prioridad      = solicitud.prioridad_anterior or 'media'
+    solicitud.prioridad_anterior = ''
+    solicitud.es_prioritaria = False
+    solicitud.save()
+    messages.success(request, f'Prioridad de solicitud #S-{pk} restaurada a "{solicitud.get_prioridad_display()}".')
     return redirect('consultar_solicitudes')
 
 

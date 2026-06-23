@@ -2,7 +2,7 @@
 {% block title %}Reporte de Ingresos{% endblock %}
 {% block content %}
 <div class="bc">Inicio / <a href="{% url 'reportes' %}">Reportes</a> / <span>Ingresos</span></div>
-<div style="margin-bottom:20px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
+<div style="margin-bottom:16px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;">
   <div>
     <div class="pt">
       <div class="pt-ic" style="background:var(--ag);color:var(--accent);">
@@ -14,6 +14,38 @@
   </div>
   <a href="{% url 'reportes' %}" class="btn btn-o btn-sm"><i class="bi bi-arrow-left"></i> Volver</a>
 </div>
+
+<!-- FILTRO DE FECHAS -->
+<div class="card" style="padding:14px 18px;margin-bottom:16px;">
+  <form method="get" style="display:flex;align-items:flex-end;gap:12px;flex-wrap:wrap;">
+    <div>
+      <label style="font-size:.75rem;color:var(--t3);display:block;margin-bottom:4px;">Fecha inicio</label>
+      <input type="date" name="fecha_inicio" value="{{ fecha_inicio_str }}" class="fc" style="width:160px;">
+    </div>
+    <div>
+      <label style="font-size:.75rem;color:var(--t3);display:block;margin-bottom:4px;">Fecha fin</label>
+      <input type="date" name="fecha_fin" value="{{ fecha_fin_str }}" class="fc" style="width:160px;">
+    </div>
+    <button type="submit" class="btn btn-p btn-sm"><i class="bi bi-funnel"></i> Filtrar</button>
+    {% if fecha_inicio_str or fecha_fin_str %}
+    <a href="{% url 'reporte_ingresos' %}" class="btn btn-o btn-sm"><i class="bi bi-x-circle"></i> Limpiar</a>
+    {% endif %}
+    <a href="{% url 'reporte_ingresos_pdf' %}?fecha_inicio={{ fecha_inicio_str }}&fecha_fin={{ fecha_fin_str }}"
+       class="btn btn-sm" style="background:#E8445A;color:#fff;margin-left:auto;" target="_blank">
+      <i class="bi bi-file-earmark-pdf"></i> Exportar PDF
+    </a>
+  </form>
+  {% if error_fecha %}
+  <div style="margin-top:8px;color:#E8445A;font-size:.82rem;"><i class="bi bi-exclamation-triangle"></i> {{ error_fecha }}</div>
+  {% endif %}
+</div>
+
+{% if sin_datos %}
+<div class="card" style="padding:18px;text-align:center;color:var(--t3);margin-bottom:16px;">
+  <i class="bi bi-inbox" style="font-size:2rem;"></i>
+  <p style="margin-top:8px;">Sin ingresos en el período seleccionado.</p>
+</div>
+{% endif %}
 
 <!-- MÉTRICAS -->
 <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:20px;">

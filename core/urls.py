@@ -38,6 +38,7 @@ urlpatterns = [
     path('solicitudes/<int:pk>/pdf/', views.informe_pdf, name='informe_pdf'),
     path('solicitudes/<int:pk>/eliminar/', views.eliminar_solicitud, name='eliminar_solicitud'),
     path('solicitudes/<int:pk>/prioritaria/', views.marcar_prioritaria, name='marcar_prioritaria'),
+    path('solicitudes/<int:pk>/quitar-prioritaria/', views.quitar_prioritaria, name='quitar_prioritaria'),
     path('solicitudes/<int:pk>/reasignar/', views.reasignar_tecnico, name='reasignar_tecnico'),
     path('solicitudes/<int:pk>/ampliacion/', views.solicitar_ampliacion, name='solicitar_ampliacion'),
 
@@ -49,8 +50,11 @@ urlpatterns = [
     # ── REPORTES ──
     path('reportes/', views.reportes, name='reportes'),
     path('reportes/solicitudes/', views.reporte_solicitudes, name='reporte_solicitudes'),
+    path('reportes/solicitudes/pdf/', views.reporte_solicitudes_pdf, name='reporte_solicitudes_pdf'),
     path('reportes/tiempos/', views.reporte_tiempos, name='reporte_tiempos'),
+    path('reportes/tiempos/pdf/', views.reporte_tiempos_pdf, name='reporte_tiempos_pdf'),
     path('reportes/ingresos/', views.reporte_ingresos, name='reporte_ingresos'),
+    path('reportes/ingresos/pdf/', views.reporte_ingresos_pdf, name='reporte_ingresos_pdf'),
 
     # ── SEGUIMIENTO PÚBLICO ──
     path('seguimiento/<int:pk>/', views.seguimiento, name='seguimiento'),

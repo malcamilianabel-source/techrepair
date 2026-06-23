@@ -124,8 +124,9 @@ class Solicitud(models.Model):
                                          default='media')
     estado           = models.CharField(max_length=15, choices=ESTADOS,
                                          default='pendiente')
-    es_prioritaria   = models.BooleanField(default=False)
-    fecha_ingreso    = models.DateField(auto_now_add=True)
+    es_prioritaria    = models.BooleanField(default=False)
+    prioridad_anterior= models.CharField(max_length=10, blank=True, default='')
+    fecha_ingreso     = models.DateField(auto_now_add=True)
     dias_estimados        = models.IntegerField(null=True, blank=True)
     fecha_estimada        = models.DateField(null=True, blank=True)
     fecha_hora_estimada   = models.DateTimeField(null=True, blank=True)
