@@ -70,7 +70,18 @@
 
 <!-- MIS SOLICITUDES -->
 <div class="card">
-  <div class="ct">Mis solicitudes asignadas</div>
+  <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 18px 0;">
+    <div class="ct" style="padding:0;margin:0;">Mis solicitudes asignadas</div>
+    {% if orden == 'desc' %}
+    <a href="?orden=asc" class="btn btn-o btn-sm" title="Ordenar: Baja → Alta">
+      <i class="bi bi-sort-up"></i> Prioridad ↑
+    </a>
+    {% else %}
+    <a href="?orden=desc" class="btn btn-o btn-sm" title="Ordenar: Alta → Baja">
+      <i class="bi bi-sort-down"></i> Prioridad ↓
+    </a>
+    {% endif %}
+  </div>
   {% if mis_solicitudes %}
   <div class="tw">
     <table>

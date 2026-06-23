@@ -282,5 +282,33 @@ function actualizarCountdowns(){
 actualizarCountdowns();
 setInterval(actualizarCountdowns, 1000);
 </script>
+
+<!-- AUTO-FILTRO: envía el form GET con debounce al escribir o cambiar selects -->
+<script>
+(function(){
+  let _debounceTimer = null;
+
+  function autoSubmit(form) {
+    clearTimeout(_debounceTimer);
+    _debounceTimer = setTimeout(function(){ form.submit(); }, 420);
+  }
+
+  document.addEventListener('DOMContentLoaded', function(){
+    // Aplica a todos los forms GET que tengan input[name="q"]
+    document.querySelectorAll('form[method="GET"]').forEach(function(form){
+      var qInput = form.querySelector('input[name="q"]');
+      if (!qInput) return;
+
+      // Texto: debounce al escribir
+      qInput.addEventListener('input', function(){ autoSubmit(form); });
+
+      // Selects (estado, prioridad, etc.): inmediato al cambiar
+      form.querySelectorAll('select').forEach(function(sel){
+        sel.addEventListener('change', function(){ autoSubmit(form); });
+      });
+    });
+  });
+})();
+</script>
 </body>
 </html>

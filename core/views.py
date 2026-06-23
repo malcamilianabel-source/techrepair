@@ -43,10 +43,20 @@ def dashboard(request):
     import re
 
     if request.user.rol == 'tec':
+        from django.db.models import Case, When, IntegerField
         # Dashboard del técnico — solo sus solicitudes
+        orden = request.GET.get('orden', 'desc')  # desc=Alta primero, asc=Baja primero
+        orden_prioridad = Case(
+            When(prioridad='alta',  then=0),
+            When(prioridad='media', then=1),
+            When(prioridad='baja',  then=2),
+            default=3, output_field=IntegerField(),
+        )
         mis_solicitudes = Solicitud.objects.filter(
             detalle__tecnico=request.user
-        ).select_related('cliente', 'equipo').order_by('-creado_en')
+        ).select_related('cliente', 'equipo').annotate(
+            _ord=orden_prioridad
+        ).order_by('_ord' if orden == 'desc' else '-_ord', '-creado_en')
 
         pendientes  = mis_solicitudes.filter(estado='pendiente').count()
         en_proceso  = mis_solicitudes.filter(estado='proceso').count()
@@ -68,6 +78,7 @@ def dashboard(request):
             'finalizadas':     finalizadas,
             'total_horas':     total_horas,
             'total_activas':   activas.count(),
+            'orden':           orden,
         })
 
     else:
@@ -397,18 +408,20 @@ def consultar_solicitudes(request):
     tecnico  = request.GET.get('tecnico', '')
     prioridad= request.GET.get('prioridad', '')
     q        = request.GET.get('q', '')
+    orden    = request.GET.get('orden', 'desc')  # desc=Alta primero, asc=Baja primero
 
+    orden_prioridad = Case(
+        When(prioridad='alta',  then=0),
+        When(prioridad='media', then=1),
+        When(prioridad='baja',  then=2),
+        default=3,
+        output_field=IntegerField(),
+    )
     solicitudes = Solicitud.objects.select_related(
         'cliente', 'equipo', 'detalle__tecnico'
     ).annotate(
-        orden_prioridad=Case(
-            When(prioridad='alta',  then=0),
-            When(prioridad='media', then=1),
-            When(prioridad='baja',  then=2),
-            default=3,
-            output_field=IntegerField(),
-        )
-    ).order_by('orden_prioridad', '-creado_en')
+        _ord=orden_prioridad
+    ).order_by('_ord' if orden == 'desc' else '-_ord', '-creado_en')
 
     if request.user.rol == 'tec':
         solicitudes = solicitudes.filter(detalle__tecnico=request.user)
@@ -422,12 +435,19 @@ def consultar_solicitudes(request):
 
     tecnicos = Usuario.objects.filter(rol='tec')
 
+    from django.core.paginator import Paginator
+    paginator  = Paginator(solicitudes, 20)
+    page_num   = request.GET.get('page', 1)
+    page_obj   = paginator.get_page(page_num)
+
     return render(request, 'core/solicitudes/consultar.html', {
-        'solicitudes': solicitudes,
+        'solicitudes': page_obj,
+        'page_obj':    page_obj,
         'tecnicos':    tecnicos,
         'estado':      estado,
         'prioridad':   prioridad,
         'q':           q,
+        'orden':       orden,
     })
 
 
