@@ -20,7 +20,8 @@ def rol_requerido(*roles):
 
 def tecnico_asignado_o_staff(user, solicitud):
     """True si el usuario es admin/recep, o si es el técnico asignado."""
-    if user.rol in ('admin', 'recep'):
+    from .models import Usuario
+    if user.rol in (Usuario.Rol.ADMINISTRADOR, Usuario.Rol.RECEPCIONISTA):
         return True
     detalle = getattr(solicitud, 'detalle', None)
     return detalle is not None and detalle.tecnico_id == user.id

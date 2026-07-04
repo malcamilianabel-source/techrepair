@@ -10,22 +10,32 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# ── SEGURIDAD ─────────────────────────────────────────────────────────────────
+# En producción estas variables DEBEN venir del entorno (Railway, .env, etc.)
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if not SECRET_KEY:
+    # Solo permitido en desarrollo local
+    import warnings
+    warnings.warn(
+        "SECRET_KEY no está configurada como variable de entorno. "
+        "Usando clave insegura — NUNCA usar en producción.",
+        stacklevel=2,
+    )
+    SECRET_KEY = 'django-insecure-0@gs%pwwg@w=%sn8_-_e6(mwz6^0cycif7g-g$sppw$p27j-@q'
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-0@gs%pwwg@w=%sn8_-_e6(mwz6^0cycif7g-g$sppw$p27j-@q'
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
-
-ALLOWED_HOSTS = []
+_allowed = os.environ.get('ALLOWED_HOSTS', '')
+ALLOWED_HOSTS = _allowed.split(',') if _allowed else (['*'] if DEBUG else ['127.0.0.1', 'localhost'])
 
 
 # Application definition
@@ -42,12 +52,14 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.middleware.SesionActivaMiddleware',
 ]
 
 ROOT_URLCONF = 'techrepair.urls'
@@ -80,70 +92,53 @@ DATABASES = {
     }
 }
 
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+if DATABASE_URL:
+    DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgres://')
+    DATABASES['default'] = dj_database_url.parse(DATABASE_URL, conn_max_age=600)
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
-
+LANGUAGE_CODE = 'es-pe'
 TIME_ZONE = 'America/Lima'
-
 USE_I18N = True
-
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
-
+# Static files
 STATIC_URL = 'static/'
-
-AUTH_USER_MODEL = 'core.Usuario'
-LOGIN_URL = 'login'
-LANGUAGE_CODE = 'es-pe'
-
-import os
-import dj_database_url
-
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-0@gs%pwwg@w=%sn8_-_e6(mwz6^0cycif7g-g$sppw$p27j-@q')
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
-
-MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
-MIDDLEWARE.append('core.middleware.SesionActivaMiddleware')
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 STORAGES = {
     'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
     'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
 }
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-DATABASE_URL = os.environ.get('DATABASE_URL', '')
-if DATABASE_URL:
-    DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgres://')
-    DATABASES['default'] = dj_database_url.parse(DATABASE_URL, conn_max_age=600)
 
+# Auth
+AUTH_USER_MODEL = 'core.Usuario'
+LOGIN_URL = 'login'
+DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# CSRF
 CSRF_TRUSTED_ORIGINS = ['https://web-production-1ce30.up.railway.app']
 
+
+# ── PRODUCCIÓN ────────────────────────────────────────────────────────────────
 if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True

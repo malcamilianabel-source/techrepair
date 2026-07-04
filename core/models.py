@@ -6,12 +6,12 @@ from django.contrib.auth.models import AbstractUser
 
 # ── MODELO 1: USUARIO ──────────────────────────────────────────
 class Usuario(AbstractUser):
-    ROLES = [
-        ('admin', 'Administrador'),
-        ('recep', 'Recepcionista'),
-        ('tec',   'Técnico'),
-    ]
-    rol      = models.CharField(max_length=10, choices=ROLES, default='tec')
+    class Rol(models.TextChoices):
+        RECEPCIONISTA = 'recep', 'Recepcionista'
+        TECNICO       = 'tec',   'Técnico'
+        ADMINISTRADOR = 'admin', 'Administrador'
+
+    rol      = models.CharField(max_length=10, choices=Rol.choices, default=Rol.TECNICO)
     ESPECIALIDADES = [
     ('general',     'General'),
     ('electronica', 'Reparación Electrónica'),
@@ -152,6 +152,34 @@ class Solicitud(models.Model):
     def __str__(self):
         return f"#{self.id} — {self.cliente.nombre} ({self.get_estado_display()})"
 
+    @property
+    def esta_activa(self):
+        """True si la solicitud NO está finalizada ni entregada."""
+        return self.estado not in ('finalizado', 'entregado')
+
+    @property
+    def dias_en_taller(self):
+        """Días transcurridos desde el ingreso hasta hoy (o hasta la entrega)."""
+        import datetime
+        fin = self.fecha_entrega or datetime.date.today()
+        return (fin - self.fecha_ingreso).days
+
+    @property
+    def tiene_costo(self):
+        """True si existe un registro de Costo asociado."""
+        try:
+            return self.costo is not None
+        except Costo.DoesNotExist:
+            return False
+
+    @property
+    def tiene_tecnico(self):
+        """True si hay un técnico asignado en el detalle."""
+        try:
+            return self.detalle.tecnico is not None
+        except DetalleSolicitud.DoesNotExist:
+            return False
+
 
 # ── MODELO 5: DETALLE SOLICITUD ────────────────────────────────
 class DetalleSolicitud(models.Model):
@@ -276,7 +304,8 @@ class Notificacion(models.Model):
     def __str__(self):
         return f"Notif. #{self.solicitud.id} — {self.get_medio_display()}"
 
-        # ── MODELO 11: AMPLIACIÓN DE TIEMPO ───────────────────────────
+
+# ── MODELO 11: AMPLIACION DE TIEMPO ──────────────────────────
 class AmpliacionTiempo(models.Model):
     UNIDADES = [
         ('horas',   'Horas'),
@@ -292,4 +321,5 @@ class AmpliacionTiempo(models.Model):
     fecha_hora    = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f'Ampliación #{self.solicitud.id}: +{self.cantidad} {self.unidad}'
+        sufijo = f'+{self.cantidad} {self.unidad}'
+        return f'Ampliacion #{self.solicitud.id}: {sufijo}'
