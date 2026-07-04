@@ -1,5 +1,6 @@
 from django import forms
-from .models import Cliente, Equipo, Solicitud, Usuario, DetalleSolicitud, Avance
+from .models import (Cliente, Equipo, Solicitud, Usuario, DetalleSolicitud,
+                     Avance, Repuesto, Costo)
 
 # ── FORMULARIO CLIENTE ─────────────────────────────────────────
 class ClienteForm(forms.ModelForm):
@@ -141,6 +142,26 @@ class SolicitudForm(forms.ModelForm):
             raise forms.ValidationError('Debes seleccionar un tipo de reparación.')
         return valor
 
+    def clean(self):
+        cleaned = super().clean()
+        cliente = cleaned.get('cliente')
+        equipo  = cleaned.get('equipo')
+        if cliente and equipo and equipo.cliente_id != cliente.id:
+            self.add_error('equipo', 'El equipo no pertenece al cliente seleccionado.')
+        if cliente and equipo:
+            from .models import Solicitud
+            qs = Solicitud.objects.filter(
+                cliente=cliente, equipo=equipo,
+                estado__in=['pendiente', 'proceso']
+            )
+            if self.instance and self.instance.pk:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise forms.ValidationError(
+                    'Ya existe una solicitud activa para este equipo y cliente.'
+                )
+        return cleaned
+
 
 # ── FORMULARIO ACTUALIZAR CLIENTE (sin DNI) ────────────────────
 class ClienteUpdateForm(forms.ModelForm):
@@ -268,9 +289,9 @@ class UsuarioForm(forms.ModelForm):
         return valor
 
     def clean_password(self):
+        from django.contrib.auth.password_validation import validate_password
         password = self.cleaned_data.get('password', '')
-        if len(password) < 8:
-            raise forms.ValidationError('La contraseña debe tener al menos 8 caracteres.')
+        validate_password(password)
         return password
 
     def save(self, commit=True):
@@ -420,3 +441,33 @@ class AmpliacionTiempoForm(forms.Form):
             'placeholder': 'Explica el motivo por el que necesitas más tiempo...',
         })
     )
+
+
+class RepuestoForm(forms.ModelForm):
+    class Meta:
+        model  = Repuesto
+        fields = ['nombre', 'cantidad', 'precio_unit']
+
+    def clean_precio_unit(self):
+        precio = self.cleaned_data.get('precio_unit')
+        if precio is not None and precio < 0:
+            raise forms.ValidationError('El precio no puede ser negativo.')
+        return precio
+
+    def clean_cantidad(self):
+        cantidad = self.cleaned_data.get('cantidad')
+        if cantidad is not None and cantidad <= 0:
+            raise forms.ValidationError('La cantidad debe ser mayor a cero.')
+        return cantidad
+
+
+class CostoForm(forms.ModelForm):
+    class Meta:
+        model  = Costo
+        fields = ['mano_obra']
+
+    def clean_mano_obra(self):
+        valor = self.cleaned_data.get('mano_obra')
+        if valor is not None and valor < 0:
+            raise forms.ValidationError('La mano de obra no puede ser negativa.')
+        return valor

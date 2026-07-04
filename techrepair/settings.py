@@ -118,22 +118,35 @@ USE_TZ = True
 STATIC_URL = 'static/'
 
 AUTH_USER_MODEL = 'core.Usuario'
+LOGIN_URL = 'login'
+LANGUAGE_CODE = 'es-pe'
 
-# ── PRODUCCIÓN ─────────────────────────────────────────────────
 import os
 import dj_database_url
 
+SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-0@gs%pwwg@w=%sn8_-_e6(mwz6^0cycif7g-g$sppw$p27j-@q')
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+
 MIDDLEWARE.insert(1, 'whitenoise.middleware.WhiteNoiseMiddleware')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+MIDDLEWARE.append('core.middleware.SesionActivaMiddleware')
+
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage'},
+}
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 if DATABASE_URL:
-    # Convertir postgresql:// a postgres:// para compatibilidad
     DATABASE_URL = DATABASE_URL.replace('postgresql://', 'postgres://')
-    DATABASES['default'] = dj_database_url.parse(
-        DATABASE_URL, conn_max_age=600)
+    DATABASES['default'] = dj_database_url.parse(DATABASE_URL, conn_max_age=600)
 
-ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = ['https://web-production-1ce30.up.railway.app']
-SECRET_KEY = os.environ.get('SECRET_KEY', SECRET_KEY)
+
+if not DEBUG:
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

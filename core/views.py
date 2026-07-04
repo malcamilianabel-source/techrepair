@@ -1,16 +1,67 @@
+import uuid
 import datetime
-from django.db.models.deletion import ProtectedError
-from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth import authenticate, login, logout
+import json
+import re
+from decimal import Decimal
+
 from django.contrib import messages
+from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.decorators import login_required
-from .models import (Usuario, Cliente, Equipo, Solicitud, DetalleSolicitud,
-                     HistorialEstado, Avance, Repuesto, Costo, AmpliacionTiempo)
-from .forms import (ClienteForm, ClienteUpdateForm, EquipoForm, EquipoUpdateForm, SolicitudForm,
-                    CambiarEstadoForm, AsignarTecnicoForm, UsuarioForm,
-                    DiagnosticoForm, AvanceForm, NotaBitacoraForm, AmpliacionTiempoForm)
+from django.core.paginator import Paginator
+from django.db import transaction
+from django.db.models import Avg, Case, Count, DecimalField, F, IntegerField, Q, Sum, When
+from django.db.models.deletion import ProtectedError
+from django.db.models.functions import TruncMonth
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_POST
+
+from .decorators import rol_requerido, tecnico_asignado_o_staff
+from .forms import (
+    AmpliacionTiempoForm, AsignarTecnicoForm, AvanceForm, CambiarEstadoForm,
+    ClienteForm, ClienteUpdateForm, CostoForm, DiagnosticoForm, EquipoForm,
+    EquipoUpdateForm, NotaBitacoraForm, RepuestoForm, SolicitudForm, UsuarioForm,
+)
+from .models import (
+    AmpliacionTiempo, Avance, Cliente, Costo, DetalleSolicitud, Equipo,
+    HistorialEstado, Notificacion, Repuesto, Solicitud, Usuario,
+)
 
 # deploy test
+
+
+# ── HELPERS ────────────────────────────────────────────────────
+
+def parsear_rango_fechas(request):
+    """Devuelve (fecha_inicio, fecha_fin, fi_str, ff_str, error)."""
+    fi_str = request.GET.get('fecha_inicio', '')
+    ff_str = request.GET.get('fecha_fin', '')
+    fi = ff = error = None
+    try:
+        if fi_str:
+            fi = datetime.date.fromisoformat(fi_str)
+        if ff_str:
+            ff = datetime.date.fromisoformat(ff_str)
+        if fi and ff and fi > ff:
+            error = 'La fecha de inicio no puede ser mayor que la fecha fin.'
+            fi = ff = None
+    except ValueError:
+        error = 'Formato de fecha inválido.'
+        fi = ff = None
+    return fi, ff, fi_str, ff_str, error
+
+
+def filtrar_por_rango(qs, campo_fecha, fi, ff):
+    if fi:
+        qs = qs.filter(**{f'{campo_fecha}__gte': fi})
+    if ff:
+        qs = qs.filter(**{f'{campo_fecha}__lte': ff})
+    return qs
+
+
+def paginar(request, qs, per_page=20):
+    return Paginator(qs, per_page).get_page(request.GET.get('page', 1))
 
 # ── LOGIN ──────────────────────────────────────────────────────
 def login_view(request):
@@ -38,12 +89,9 @@ def logout_view(request):
 
 
 # ── DASHBOARD ─────────────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def dashboard(request):
-    import re
-
     if request.user.rol == 'tec':
-        from django.db.models import Case, When, IntegerField
         # Dashboard del técnico — solo sus solicitudes
         orden = request.GET.get('orden', 'desc')  # desc=Alta primero, asc=Baja primero
         orden_prioridad = Case(
@@ -64,12 +112,8 @@ def dashboard(request):
 
         # Calcular horas de carga personal
         activas = mis_solicitudes.filter(estado__in=['pendiente', 'proceso'])
-        total_horas = 0
-        for sol in activas:
-            if sol.tiempo_estimado_texto:
-                m = re.search(r'\d+', sol.tiempo_estimado_texto)
-                if m:
-                    total_horas += int(m.group())
+        agg = activas.aggregate(horas=Sum('tiempo_estimado_horas'))
+        total_horas = int(agg['horas'] or 0)
 
         return render(request, 'core/dashboard.html', {
             'mis_solicitudes': mis_solicitudes[:8],
@@ -89,25 +133,24 @@ def dashboard(request):
         finalizadas = Solicitud.objects.filter(estado='finalizado').count()
 
         # Carga por técnico con horas
-        tecnicos = Usuario.objects.filter(rol='tec')
-        carga_tecnicos = []
-        for tec in tecnicos:
-            sols = Solicitud.objects.filter(
-                detalle__tecnico=tec,
-                estado__in=['pendiente', 'proceso']
-            )
-            total_trabajos = sols.count()
-            total_horas = 0
-            for sol in sols:
-                if sol.tiempo_estimado_texto:
-                    m = re.search(r'\d+', sol.tiempo_estimado_texto)
-                    if m:
-                        total_horas += int(m.group())
-            carga_tecnicos.append({
-                'nombre':   tec.get_full_name() or tec.username,
-                'trabajos': total_trabajos,
-                'horas':    total_horas,
-            })
+        tecnicos_data = Usuario.objects.filter(rol='tec').annotate(
+            trabajos=Count(
+                'detalles__solicitud',
+                filter=Q(detalles__solicitud__estado__in=['pendiente', 'proceso'])
+            ),
+            horas_dec=Sum(
+                'detalles__solicitud__tiempo_estimado_horas',
+                filter=Q(detalles__solicitud__estado__in=['pendiente', 'proceso'])
+            ),
+        )
+        carga_tecnicos = [
+            {
+                'nombre': t.get_full_name() or t.username,
+                'trabajos': t.trabajos or 0,
+                'horas': int(t.horas_dec or 0),
+            }
+            for t in tecnicos_data
+        ]
 
         recientes = Solicitud.objects.select_related(
             'cliente', 'equipo', 'detalle__tecnico'
@@ -124,28 +167,23 @@ def dashboard(request):
 
 
 # ── LISTAR CLIENTES ────────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def consultar_clientes(request):
     query    = request.GET.get('q', '')
     clientes = Cliente.objects.all().order_by('-creado_en')
     if query:
         clientes = clientes.filter(
-            nombre__icontains=query
-        ) | clientes.filter(
-            apellido__icontains=query
-        ) | clientes.filter(
-            dni__icontains=query
-        ) | clientes.filter(
-            telefono__icontains=query
+            Q(nombre__icontains=query) | Q(apellido__icontains=query) |
+            Q(dni__icontains=query)    | Q(telefono__icontains=query)
         )
+    page_obj = paginar(request, clientes)
     return render(request, 'core/clientes/consultar.html', {
-        'clientes': clientes,
-        'query':    query,
+        'clientes': page_obj, 'page_obj': page_obj, 'query': query,
     })
 
 
 # ── REGISTRAR CLIENTE ──────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def registrar_cliente(request):
     if request.method == 'POST':
         form = ClienteForm(request.POST)
@@ -162,7 +200,7 @@ def registrar_cliente(request):
 
 
 # ── ACTUALIZAR CLIENTE ─────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def actualizar_cliente(request, pk):
     cliente = get_object_or_404(Cliente, pk=pk)
     if request.method == 'POST':
@@ -179,31 +217,27 @@ def actualizar_cliente(request, pk):
     })
 
 # ── CONSULTAR EQUIPOS ──────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def consultar_equipos(request):
     query   = request.GET.get('q', '')
     tipo    = request.GET.get('tipo', '')
     equipos = Equipo.objects.select_related('cliente').order_by('-creado_en')
     if query:
         equipos = equipos.filter(
-            marca__icontains=query
-        ) | equipos.filter(
-            modelo__icontains=query
-        ) | equipos.filter(
-            serie__icontains=query
+            Q(marca__icontains=query) | Q(modelo__icontains=query) |
+            Q(serie__icontains=query)
         )
     if tipo:
         equipos = equipos.filter(tipo=tipo)
+    page_obj = paginar(request, equipos)
     return render(request, 'core/equipos/consultar.html', {
-        'equipos': equipos,
-        'query':   query,
-        'tipo':    tipo,
-        'tipos':   Equipo.TIPOS,
+        'equipos': page_obj, 'page_obj': page_obj,
+        'query': query, 'tipo': tipo, 'tipos': Equipo.TIPOS,
     })
 
 
 # ── REGISTRAR EQUIPO ───────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def registrar_equipo(request):
     if request.user.rol == 'tec':
         return redirect('dashboard')
@@ -244,15 +278,14 @@ HORA_FIN    = 22  # 10pm
 
 def calcular_fecha_libre_laboral(now, total_horas):
     """Distribuye total_horas dentro del horario 9am-10pm."""
-    import datetime as dt_mod
     hora_actual = now.hour + now.minute / 60
 
     if hora_actual < HORA_INICIO:
         inicio = now.replace(hour=HORA_INICIO, minute=0, second=0, microsecond=0)
     elif hora_actual >= HORA_FIN:
-        inicio = dt_mod.datetime.combine(
-            now.date() + dt_mod.timedelta(days=1),
-            dt_mod.time(HORA_INICIO, 0)
+        inicio = datetime.datetime.combine(
+            now.date() + datetime.timedelta(days=1),
+            datetime.time(HORA_INICIO, 0)
         )
     else:
         inicio = now
@@ -265,13 +298,13 @@ def calcular_fecha_libre_laboral(now, total_horas):
         horas_hoy = (fin_dia - current).total_seconds() / 3600
 
         if horas_restantes <= horas_hoy:
-            current = current + dt_mod.timedelta(hours=horas_restantes)
+            current = current + datetime.timedelta(hours=horas_restantes)
             break
         else:
             horas_restantes -= horas_hoy
-            current = dt_mod.datetime.combine(
-                current.date() + dt_mod.timedelta(days=1),
-                dt_mod.time(HORA_INICIO, 0)
+            current = datetime.datetime.combine(
+                current.date() + datetime.timedelta(days=1),
+                datetime.time(HORA_INICIO, 0)
             )
 
     return current
@@ -305,8 +338,7 @@ def calcular_tiempo_estimado(tipo, estado_fisico, fecha_ingreso):
         minutos = round((horas - horas_int) * 60)
         tiempo_texto = f"{horas_int}h {minutos}min"
 
-    import datetime as dt_mod
-    inicio = dt_mod.datetime.combine(fecha_ingreso, dt_mod.time(HORA_INICIO, 0))
+    inicio = datetime.datetime.combine(fecha_ingreso, datetime.time(HORA_INICIO, 0))
     fecha_estimada = calcular_fecha_libre_laboral(inicio, horas)
     dias_estimados = math.ceil(horas / 8)
 
@@ -314,7 +346,7 @@ def calcular_tiempo_estimado(tipo, estado_fisico, fecha_ingreso):
 
 
 # ── REGISTRAR SOLICITUD ────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def registrar_solicitud(request):
     if request.user.rol == 'tec':
         return redirect('consultar_solicitudes')
@@ -338,48 +370,25 @@ def registrar_solicitud(request):
     if request.method == 'POST':
         form = SolicitudForm(request.POST)
         if form.is_valid():
-            solicitud = form.save(commit=False)
-            if solicitud.equipo.cliente != solicitud.cliente:
-                form.add_error('equipo',
-                    'El equipo seleccionado no pertenece al cliente elegido.')
-                return render(request, 'core/solicitudes/registrar.html', {
-                    'form': form,
-                    'cliente_fijo': cliente_fijo,
-                    'equipo_fijo':  equipo_fijo,
-                })
-            duplicada = Solicitud.objects.filter(
-                cliente    = solicitud.cliente,
-                equipo     = solicitud.equipo,
-                estado__in = ['pendiente', 'proceso']
-            ).exists()
-            if duplicada:
-                form.add_error(None,
-                    f'Ya existe una solicitud activa para {solicitud.cliente.nombre_completo} '
-                    f'con el equipo {solicitud.equipo.marca} {solicitud.equipo.modelo}. '
-                    f'Finaliza esa solicitud antes de crear una nueva.')
-                return render(request, 'core/solicitudes/registrar.html', {
-                    'form': form,
-                    'cliente_fijo': cliente_fijo,
-                    'equipo_fijo':  equipo_fijo,
-                })
-            dias, fecha_est, tiempo_texto, horas_est, fecha_hora_est = calcular_tiempo_estimado(
-                 solicitud.tipo_reparacion,
-                 solicitud.equipo.estado,
-                 datetime.date.today()
-            )
-            solicitud.dias_estimados        = dias
-            solicitud.fecha_estimada        = fecha_est
-            solicitud.fecha_hora_estimada   = fecha_hora_est
-            solicitud.tiempo_estimado_texto = tiempo_texto
-            solicitud.tiempo_estimado_horas = horas_est
-            solicitud.save()
-            HistorialEstado.objects.create(
-                solicitud    = solicitud,
-                usuario      = request.user,
-                estado_antes = '—',
-                estado_nuevo = 'pendiente',
-                observacion  = 'Solicitud creada'
-            )
+            with transaction.atomic():
+                solicitud = form.save(commit=False)
+                dias, fecha_est, tiempo_texto, horas_est, fecha_hora_est = calcular_tiempo_estimado(
+                     solicitud.tipo_reparacion,
+                     solicitud.equipo.estado,
+                     timezone.localdate()
+                )
+                solicitud.dias_estimados        = dias
+                solicitud.fecha_estimada        = fecha_est
+                solicitud.fecha_hora_estimada   = fecha_hora_est
+                solicitud.tiempo_estimado_texto = tiempo_texto
+                solicitud.tiempo_estimado_horas = horas_est
+                solicitud.save()
+                DetalleSolicitud.objects.get_or_create(solicitud=solicitud)
+                HistorialEstado.objects.create(
+                    solicitud=solicitud, usuario=request.user,
+                    estado_antes='', estado_nuevo='pendiente',
+                    observacion='Solicitud creada'
+                )
             messages.success(request,
                 f'Solicitud #{solicitud.id} registrada. '
                 f'Tiempo estimado: {tiempo_texto}.')
@@ -400,10 +409,8 @@ def registrar_solicitud(request):
 
 
 # ── CONSULTAR SOLICITUDES ──────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def consultar_solicitudes(request):
-    from django.db.models import Case, When, IntegerField
-
     estado   = request.GET.get('estado', '')
     tecnico  = request.GET.get('tecnico', '')
     prioridad= request.GET.get('prioridad', '')
@@ -431,14 +438,14 @@ def consultar_solicitudes(request):
     if prioridad:
         solicitudes = solicitudes.filter(prioridad=prioridad)
     if q:
-        solicitudes = solicitudes.filter(cliente__nombre__icontains=q)
+        solicitudes = solicitudes.filter(
+            Q(cliente__nombre__icontains=q) | Q(cliente__apellido__icontains=q) |
+            Q(cliente__dni__icontains=q)
+        )
 
     tecnicos = Usuario.objects.filter(rol='tec')
 
-    from django.core.paginator import Paginator
-    paginator  = Paginator(solicitudes, 20)
-    page_num   = request.GET.get('page', 1)
-    page_obj   = paginator.get_page(page_num)
+    page_obj = paginar(request, solicitudes)
 
     return render(request, 'core/solicitudes/consultar.html', {
         'solicitudes': page_obj,
@@ -452,7 +459,7 @@ def consultar_solicitudes(request):
 
 
 # ── DETALLE SOLICITUD ──────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def detalle_solicitud(request, pk):
     solicitud = get_object_or_404(
         Solicitud.objects.select_related('cliente', 'equipo', 'detalle__tecnico'),
@@ -460,10 +467,8 @@ def detalle_solicitud(request, pk):
     )
     # Técnicos solo pueden ver sus propias solicitudes
     if request.user.rol == 'tec':
-        try:
-            asignado = solicitud.detalle.tecnico
-        except Exception:
-            asignado = None
+        detalle = getattr(solicitud, 'detalle', None)
+        asignado = detalle.tecnico if detalle else None
         if asignado != request.user:
             messages.error(request, 'No tienes permiso para ver esta solicitud.')
             return redirect('consultar_solicitudes')
@@ -475,7 +480,7 @@ def detalle_solicitud(request, pk):
     avances_dict    = {av.etapa: av for av in avances}
     progreso_etapas = [(k, ETAPA_LABELS.get(k, k), avances_dict.get(k)) for k in ETAPA_ORDEN]
     bitacora_completa = all(avances_dict.get(k) for k in ETAPA_ORDEN)
-    seguimiento_url   = request.build_absolute_uri(f'/seguimiento/{solicitud.pk}/')
+    seguimiento_url   = request.build_absolute_uri(f'/seguimiento/{solicitud.token_seguimiento}/')
 
     return render(request, 'core/solicitudes/detalle.html', {
         'solicitud':         solicitud,
@@ -487,7 +492,7 @@ def detalle_solicitud(request, pk):
 
 
 # ── CAMBIAR ESTADO ─────────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def cambiar_estado(request, pk):
     if request.user.rol not in ['admin', 'tec']:
         return redirect('detalle_solicitud', pk=pk)
@@ -517,11 +522,8 @@ def cambiar_estado(request, pk):
 
             # Verificar técnico asignado antes de pasar a proceso
             if nuevo_estado == 'proceso':
-                tiene_tecnico = False
-                try:
-                    tiene_tecnico = solicitud.detalle.tecnico is not None
-                except Exception:
-                    tiene_tecnico = False
+                detalle = getattr(solicitud, 'detalle', None)
+                tiene_tecnico = detalle is not None and detalle.tecnico_id is not None
                 if not tiene_tecnico:
                     messages.error(
                         request,
@@ -573,11 +575,8 @@ def cambiar_estado(request, pk):
 
 
 # ── ASIGNAR TÉCNICO ────────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def asignar_tecnico(request, pk):
-    from django.db.models import Q
-    from django.utils import timezone
-
     if request.user.rol not in ['admin', 'recep']:
         return redirect('detalle_solicitud', pk=pk)
 
@@ -598,8 +597,7 @@ def asignar_tecnico(request, pk):
             tecnicos = tecnicos.exclude(pk=tecnico_actual.pk)
     except Exception:
         tecnico_actual = None
-    import datetime as dt_mod
-    now = dt_mod.datetime.now()
+    now = timezone.localtime().replace(tzinfo=None)
 
     tecnicos_libres   = []
     tecnicos_ocupados = []
@@ -612,13 +610,12 @@ def asignar_tecnico(request, pk):
         if activos == 0:
             tecnicos_libres.append(tec)
         else:
-            import datetime as dt_mod
             # Sumar todas las horas estimadas de trabajos activos
             activos_qs = Solicitud.objects.filter(
                 detalle__tecnico=tec, estado__in=['pendiente', 'proceso']
             )
-            total_horas = sum(
-                float(s.tiempo_estimado_horas or 0) for s in activos_qs
+            total_horas = float(
+                activos_qs.aggregate(h=Sum('tiempo_estimado_horas'))['h'] or Decimal('0')
             )
 
             fecha_libre     = None
@@ -672,7 +669,6 @@ def asignar_tecnico(request, pk):
 
         form = AsignarTecnicoForm(request.POST)
         if form.is_valid():
-            import datetime as dt_mod
             tec_id  = form.cleaned_data['tecnico'].pk
             tec_obj = Usuario.objects.get(pk=tec_id)
             det, _ = DetalleSolicitud.objects.get_or_create(solicitud=solicitud)
@@ -680,14 +676,14 @@ def asignar_tecnico(request, pk):
             det.save()
 
             # Recalcular fecha_estimada considerando carga actual del técnico
-            horas_actuales = sum(
-                float(s.tiempo_estimado_horas or 0)
-                for s in Solicitud.objects.filter(
+            horas_actuales = float(
+                Solicitud.objects.filter(
                     detalle__tecnico=tec_obj,
                     estado__in=['pendiente', 'proceso']
                 ).exclude(pk=solicitud.pk)
+                .aggregate(h=Sum('tiempo_estimado_horas'))['h'] or Decimal('0')
             )
-            inicio = dt_mod.datetime.now()
+            inicio = timezone.localtime().replace(tzinfo=None)
             if horas_actuales > 0:
                 inicio = calcular_fecha_libre_laboral(inicio, horas_actuales)
             nueva_fecha = calcular_fecha_libre_laboral(inicio, float(solicitud.tiempo_estimado_horas or 0))
@@ -728,7 +724,7 @@ def asignar_tecnico(request, pk):
     })
 
     # ── REGISTRAR USUARIO ──────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def registrar_usuario(request):
     if request.user.rol != 'admin':
         return redirect('dashboard')
@@ -743,7 +739,7 @@ def registrar_usuario(request):
     return render(request, 'core/usuarios/registrar.html', {'form': form})
 
 # ── CONSULTAR USUARIO ──────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def consultar_usuarios(request):
     if request.user.rol != 'admin':
         return redirect('dashboard')
@@ -751,19 +747,16 @@ def consultar_usuarios(request):
     usuarios = Usuario.objects.exclude(pk=request.user.pk).order_by('rol', 'first_name')
     if query:
         usuarios = usuarios.filter(
-            first_name__icontains=query
-        ) | usuarios.filter(
-            last_name__icontains=query
-        ) | usuarios.filter(
-            username__icontains=query
+            Q(first_name__icontains=query) | Q(last_name__icontains=query) |
+            Q(username__icontains=query)
         )
+    page_obj = paginar(request, usuarios)
     return render(request, 'core/usuarios/consultar.html', {
-        'usuarios': usuarios,
-        'query':    query,
+        'usuarios': page_obj, 'page_obj': page_obj, 'query': query,
     })
 
 # ── ELIMINAR USUARIO ────────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def eliminar_usuario(request, pk):
     if request.user.rol != 'admin':
         return redirect('dashboard')
@@ -799,9 +792,12 @@ def eliminar_usuario(request, pk):
     return redirect('consultar_usuarios')
 
     # ── DIAGNÓSTICO ────────────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def diagnostico(request, pk):
     solicitud = get_object_or_404(Solicitud, pk=pk)
+    if not tecnico_asignado_o_staff(request.user, solicitud):
+        messages.error(request, 'No tienes permiso para editar esta solicitud.')
+        return redirect('detalle_solicitud', pk=pk)
     if solicitud.estado in ['finalizado', 'entregado']:
         messages.error(request, 'No se puede editar el diagnóstico de una solicitud finalizada.')
         return redirect('detalle_solicitud', pk=pk)
@@ -820,12 +816,15 @@ def diagnostico(request, pk):
     })
 
     # ── AVANCE / BITÁCORA ──────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def avance(request, pk):
     ETAPA_ORDEN = ['diagnostico', 'desmontaje', 'reparacion', 'prueba', 'ensamblaje', 'prueba_final']
     ETAPA_LABELS = dict(Avance.ETAPAS)
 
     solicitud = get_object_or_404(Solicitud, pk=pk)
+    if not tecnico_asignado_o_staff(request.user, solicitud):
+        messages.error(request, 'No tienes permiso para editar esta solicitud.')
+        return redirect('detalle_solicitud', pk=pk)
     if solicitud.estado in ['finalizado', 'entregado']:
         messages.error(request, 'No se pueden registrar avances en una solicitud finalizada.')
         return redirect('detalle_solicitud', pk=pk)
@@ -882,41 +881,29 @@ def avance(request, pk):
     })
 
     # ── REPUESTOS ──────────────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def repuestos(request, pk):
     solicitud = get_object_or_404(Solicitud, pk=pk)
     repuestos = solicitud.repuestos.all()
     if request.method == 'POST':
-        nombre      = request.POST.get('nombre')
-        cantidad    = request.POST.get('cantidad')
-        precio_unit = request.POST.get('precio_unit')
-        if nombre and cantidad and precio_unit:
-            try:
-                cantidad_int = int(cantidad)
-                precio_dec   = float(precio_unit)
-            except (ValueError, TypeError):
-                messages.error(request, 'Cantidad y precio deben ser valores numéricos válidos.')
-                return redirect('repuestos', pk=pk)
-            if cantidad_int <= 0:
-                messages.error(request, 'La cantidad debe ser mayor a cero.')
-                return redirect('repuestos', pk=pk)
-            if precio_dec < 0:
-                messages.error(request, 'El precio no puede ser negativo.')
-                return redirect('repuestos', pk=pk)
-            Repuesto.objects.create(
-                solicitud   = solicitud,
-                nombre      = nombre,
-                cantidad    = cantidad_int,
-                precio_unit = precio_dec
+        if not tecnico_asignado_o_staff(request.user, solicitud):
+            messages.error(request, 'No tienes permiso.')
+            return redirect('detalle_solicitud', pk=pk)
+        form_rep = RepuestoForm(request.POST)
+        if form_rep.is_valid():
+            rep = form_rep.save(commit=False)
+            rep.solicitud = solicitud
+            rep.save()
+            costo, _ = Costo.objects.get_or_create(
+                solicitud=solicitud, defaults={'mano_obra': 0}
             )
-            # Actualizar costo total
-            costo, _ = Costo.objects.get_or_create(solicitud=solicitud)
-            mano_obra = request.POST.get('mano_obra')
-            if mano_obra:
-                costo.mano_obra = mano_obra
             costo.calcular_total()
             messages.success(request, 'Repuesto agregado correctamente.')
-            return redirect('repuestos', pk=pk)
+        else:
+            for campo, errores in form_rep.errors.items():
+                for e in errores:
+                    messages.error(request, f'{campo}: {e}')
+        return redirect('repuestos', pk=pk)
     return render(request, 'core/solicitudes/repuestos.html', {
         'solicitud': solicitud,
         'repuestos': repuestos,
@@ -924,16 +911,26 @@ def repuestos(request, pk):
 
 
 # ── COSTOS ─────────────────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def costos(request, pk):
     solicitud    = get_object_or_404(Solicitud, pk=pk)
     repuestos    = solicitud.repuestos.all()
-    costo, _     = Costo.objects.get_or_create(solicitud=solicitud)
+    costo, _     = Costo.objects.get_or_create(
+        solicitud=solicitud, defaults={'mano_obra': 0}
+    )
     if request.method == 'POST':
-        mano_obra = request.POST.get('mano_obra', 0)
-        costo.mano_obra = mano_obra
-        costo.calcular_total()
-        messages.success(request, 'Costo actualizado correctamente.')
+        if not tecnico_asignado_o_staff(request.user, solicitud):
+            messages.error(request, 'No tienes permiso.')
+            return redirect('detalle_solicitud', pk=pk)
+        form_costo = CostoForm(request.POST, instance=costo)
+        if form_costo.is_valid():
+            form_costo.save()
+            costo.calcular_total()
+            messages.success(request, 'Costo actualizado.')
+        else:
+            for campo, errores in form_costo.errors.items():
+                for e in errores:
+                    messages.error(request, f'{campo}: {e}')
         return redirect('costos', pk=pk)
     return render(request, 'core/solicitudes/costos.html', {
         'solicitud': solicitud,
@@ -942,7 +939,7 @@ def costos(request, pk):
     })
 
     # ── REPORTES — ÍNDICE ──────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def reportes(request):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('dashboard')
@@ -950,46 +947,27 @@ def reportes(request):
 
 
 # ── REPORTE SOLICITUDES ────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def reporte_solicitudes(request):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('dashboard')
 
-    import json
-    from django.db.models import Count
-
     # ── Filtros de fecha ──
-    fecha_inicio_str = request.GET.get('fecha_inicio', '')
-    fecha_fin_str    = request.GET.get('fecha_fin', '')
-    fecha_inicio = fecha_fin = None
-    error_fecha = ''
+    fi, ff, fecha_inicio_str, fecha_fin_str, error_fecha = parsear_rango_fechas(request)
 
-    if fecha_inicio_str:
-        try:
-            fecha_inicio = datetime.date.fromisoformat(fecha_inicio_str)
-        except ValueError:
-            error_fecha = 'Formato de fecha inválido.'
-    if fecha_fin_str:
-        try:
-            fecha_fin = datetime.date.fromisoformat(fecha_fin_str)
-        except ValueError:
-            error_fecha = 'Formato de fecha inválido.'
-    if fecha_inicio and fecha_fin and fecha_inicio > fecha_fin:
-        error_fecha = 'La fecha de inicio no puede ser posterior a la fecha de fin.'
-        fecha_inicio = fecha_fin = None
+    qs = filtrar_por_rango(Solicitud.objects.all(), 'fecha_ingreso', fi, ff)
 
-    qs = Solicitud.objects.all()
-    if fecha_inicio:
-        qs = qs.filter(fecha_ingreso__gte=fecha_inicio)
-    if fecha_fin:
-        qs = qs.filter(fecha_ingreso__lte=fecha_fin)
-
-    total   = qs.count()
+    por_estado = dict(
+        qs.values('estado')
+        .annotate(n=Count('id'))
+        .values_list('estado', 'n')
+    )
+    total = sum(por_estado.values())
     estados = {
-        'pendiente':  qs.filter(estado='pendiente').count(),
-        'proceso':    qs.filter(estado='proceso').count(),
-        'finalizado': qs.filter(estado='finalizado').count(),
-        'entregado':  qs.filter(estado='entregado').count(),
+        'pendiente':  por_estado.get('pendiente', 0),
+        'proceso':    por_estado.get('proceso', 0),
+        'finalizado': por_estado.get('finalizado', 0),
+        'entregado':  por_estado.get('entregado', 0),
     }
 
     tipos = {}
@@ -1005,7 +983,7 @@ def reporte_solicitudes(request):
         })
 
     # Solicitudes por mes — últimos 6 meses
-    hoy = datetime.date.today()
+    hoy = timezone.localdate()
     meses_labels = []
     meses_data   = []
     for i in range(5, -1, -1):
@@ -1045,44 +1023,20 @@ def reporte_solicitudes(request):
         'fecha_inicio_str':  fecha_inicio_str,
         'fecha_fin_str':     fecha_fin_str,
         'error_fecha':       error_fecha,
-        'sin_datos':         total == 0 and (fecha_inicio or fecha_fin),
+        'sin_datos':         total == 0 and (fi or ff),
     })
 
 
 # ── REPORTE TIEMPOS ────────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def reporte_tiempos(request):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('dashboard')
 
-    import json
-    from django.db.models import Avg, Sum
-
     # ── Filtros de fecha ──
-    fecha_inicio_str = request.GET.get('fecha_inicio', '')
-    fecha_fin_str    = request.GET.get('fecha_fin', '')
-    fecha_inicio = fecha_fin = None
-    error_fecha = ''
+    fi, ff, fecha_inicio_str, fecha_fin_str, error_fecha = parsear_rango_fechas(request)
 
-    if fecha_inicio_str:
-        try:
-            fecha_inicio = datetime.date.fromisoformat(fecha_inicio_str)
-        except ValueError:
-            error_fecha = 'Formato de fecha inválido.'
-    if fecha_fin_str:
-        try:
-            fecha_fin = datetime.date.fromisoformat(fecha_fin_str)
-        except ValueError:
-            error_fecha = 'Formato de fecha inválido.'
-    if fecha_inicio and fecha_fin and fecha_inicio > fecha_fin:
-        error_fecha = 'La fecha de inicio no puede ser posterior a la fecha de fin.'
-        fecha_inicio = fecha_fin = None
-
-    qs = Solicitud.objects.all()
-    if fecha_inicio:
-        qs = qs.filter(fecha_ingreso__gte=fecha_inicio)
-    if fecha_fin:
-        qs = qs.filter(fecha_ingreso__lte=fecha_fin)
+    qs = filtrar_por_rango(Solicitud.objects.all(), 'fecha_ingreso', fi, ff)
 
     tiempos_por_tipo = {}
     for t, label in Solicitud.TIPOS_REP:
@@ -1131,50 +1085,32 @@ def reporte_tiempos(request):
         'fecha_inicio_str':  fecha_inicio_str,
         'fecha_fin_str':     fecha_fin_str,
         'error_fecha':       error_fecha,
-        'sin_datos':         qs.count() == 0 and (fecha_inicio or fecha_fin),
+        'sin_datos':         qs.count() == 0 and (fi or ff),
     })
 
 # ── REPORTE INGRESOS ───────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def reporte_ingresos(request):
     if request.user.rol != 'admin':
         return redirect('dashboard')
 
-    import json
-
     # ── Filtros de fecha ──
-    fecha_inicio_str = request.GET.get('fecha_inicio', '')
-    fecha_fin_str    = request.GET.get('fecha_fin', '')
-    fecha_inicio = fecha_fin = None
-    error_fecha = ''
-
-    if fecha_inicio_str:
-        try:
-            fecha_inicio = datetime.date.fromisoformat(fecha_inicio_str)
-        except ValueError:
-            error_fecha = 'Formato de fecha inválido.'
-    if fecha_fin_str:
-        try:
-            fecha_fin = datetime.date.fromisoformat(fecha_fin_str)
-        except ValueError:
-            error_fecha = 'Formato de fecha inválido.'
-    if fecha_inicio and fecha_fin and fecha_inicio > fecha_fin:
-        error_fecha = 'La fecha de inicio no puede ser posterior a la fecha de fin.'
-        fecha_inicio = fecha_fin = None
+    fi, ff, fecha_inicio_str, fecha_fin_str, error_fecha = parsear_rango_fechas(request)
 
     costos_qs = Costo.objects.select_related('solicitud__cliente', 'solicitud__equipo').all()
-    if fecha_inicio:
-        costos_qs = costos_qs.filter(solicitud__fecha_ingreso__gte=fecha_inicio)
-    if fecha_fin:
-        costos_qs = costos_qs.filter(solicitud__fecha_ingreso__lte=fecha_fin)
+    costos_qs = filtrar_por_rango(costos_qs, 'solicitud__fecha_ingreso', fi, ff)
 
-    total_ingresos  = sum(c.total     for c in costos_qs)
-    total_mano_obra = sum(c.mano_obra for c in costos_qs)
+    agg = costos_qs.aggregate(
+        total_ingresos=Sum('total'),
+        total_mano_obra=Sum('mano_obra'),
+    )
+    total_ingresos  = agg['total_ingresos']  or Decimal('0')
+    total_mano_obra = agg['total_mano_obra'] or Decimal('0')
     total_repuestos = total_ingresos - total_mano_obra
     ticket_promedio = round(total_ingresos / costos_qs.count(), 2) if costos_qs.count() else 0
 
     # Ingresos por mes — últimos 6 meses
-    hoy = datetime.date.today()
+    hoy = timezone.localdate()
     meses_labels   = []
     meses_ingresos = []
     meses_mano     = []
@@ -1183,24 +1119,26 @@ def reporte_ingresos(request):
         month = hoy.month - i
         while month <= 0:
             month += 12; year -= 1
-        sols_mes = costos_qs.filter(
+        agg_mes = costos_qs.filter(
             solicitud__fecha_ingreso__year=year,
             solicitud__fecha_ingreso__month=month
-        )
+        ).aggregate(total=Sum('total'), mano=Sum('mano_obra'))
         meses_labels.append(datetime.date(year, month, 1).strftime('%b %Y'))
-        meses_ingresos.append(float(sum(c.total     for c in sols_mes)))
-        meses_mano.append(float(sum(c.mano_obra for c in sols_mes)))
+        meses_ingresos.append(float(agg_mes['total'] or 0))
+        meses_mano.append(float(agg_mes['mano'] or 0))
 
     # Ingresos por tipo de reparación
     ingresos_tipo = {}
     for t, label in Solicitud.TIPOS_REP:
-        ingresos_tipo[label] = float(sum(c.total for c in costos_qs.filter(solicitud__tipo_reparacion=t)))
+        agg_t = costos_qs.filter(solicitud__tipo_reparacion=t).aggregate(total=Sum('total'))
+        ingresos_tipo[label] = float(agg_t['total'] or 0)
 
     # Ingresos por técnico
     tec_ingresos = []
     for tec in Usuario.objects.filter(rol='tec'):
-        ing = sum(c.total for c in costos_qs.filter(solicitud__detalle__tecnico=tec))
-        tec_ingresos.append({'nombre': tec.get_full_name() or tec.username, 'total': float(ing)})
+        agg_tec = costos_qs.filter(solicitud__detalle__tecnico=tec).aggregate(total=Sum('total'))
+        tec_ingresos.append({'nombre': tec.get_full_name() or tec.username,
+                             'total': float(agg_tec['total'] or 0)})
     tec_ingresos.sort(key=lambda x: x['total'], reverse=True)
 
     ultimos = costos_qs.order_by('-solicitud__creado_en')[:10]
@@ -1223,11 +1161,11 @@ def reporte_ingresos(request):
         'fecha_inicio_str':     fecha_inicio_str,
         'fecha_fin_str':        fecha_fin_str,
         'error_fecha':          error_fecha,
-        'sin_datos':            costos_qs.count() == 0 and (fecha_inicio or fecha_fin),
+        'sin_datos':            costos_qs.count() == 0 and (fi or ff),
     })
 
     # ── PDF REPORTE SOLICITUDES ────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def reporte_solicitudes_pdf(request):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('dashboard')
@@ -1238,23 +1176,11 @@ def reporte_solicitudes_pdf(request):
     from reportlab.lib.units import cm
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib.enums import TA_CENTER, TA_LEFT
-    from django.http import HttpResponse
-    from django.db.models import Count
     import io
 
-    fecha_inicio_str = request.GET.get('fecha_inicio', '')
-    fecha_fin_str    = request.GET.get('fecha_fin', '')
-    fecha_inicio = fecha_fin = None
-    if fecha_inicio_str:
-        try: fecha_inicio = datetime.date.fromisoformat(fecha_inicio_str)
-        except ValueError: pass
-    if fecha_fin_str:
-        try: fecha_fin = datetime.date.fromisoformat(fecha_fin_str)
-        except ValueError: pass
+    fecha_inicio, fecha_fin, fecha_inicio_str, fecha_fin_str, error_fecha = parsear_rango_fechas(request)
 
-    qs = Solicitud.objects.all()
-    if fecha_inicio: qs = qs.filter(fecha_ingreso__gte=fecha_inicio)
-    if fecha_fin:    qs = qs.filter(fecha_ingreso__lte=fecha_fin)
+    qs = filtrar_por_rango(Solicitud.objects.all(), 'fecha_ingreso', fecha_inicio, fecha_fin)
 
     total = qs.count()
     estados = {
@@ -1314,7 +1240,7 @@ def reporte_solicitudes_pdf(request):
 
     story = [
         Paragraph('TechRepair — Reporte de Solicitudes', titulo_s),
-        Paragraph(f'Generado el {datetime.date.today().strftime("%d/%m/%Y")}{periodo}', subtit_s),
+        Paragraph(f'Generado el {timezone.localdate().strftime("%d/%m/%Y")}{periodo}', subtit_s),
         Spacer(1, 0.4*cm),
         Paragraph('RESUMEN GENERAL', seccion_s),
         tabla([['Total solicitudes', 'Resueltas', 'Tasa de resolución'],
@@ -1345,7 +1271,7 @@ def reporte_solicitudes_pdf(request):
 
 
 # ── PDF REPORTE TIEMPOS ────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def reporte_tiempos_pdf(request):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('dashboard')
@@ -1355,23 +1281,11 @@ def reporte_tiempos_pdf(request):
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import cm
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from django.http import HttpResponse
-    from django.db.models import Avg, Sum
     import io
 
-    fecha_inicio_str = request.GET.get('fecha_inicio', '')
-    fecha_fin_str    = request.GET.get('fecha_fin', '')
-    fecha_inicio = fecha_fin = None
-    if fecha_inicio_str:
-        try: fecha_inicio = datetime.date.fromisoformat(fecha_inicio_str)
-        except ValueError: pass
-    if fecha_fin_str:
-        try: fecha_fin = datetime.date.fromisoformat(fecha_fin_str)
-        except ValueError: pass
+    fecha_inicio, fecha_fin, fecha_inicio_str, fecha_fin_str, error_fecha = parsear_rango_fechas(request)
 
-    qs = Solicitud.objects.all()
-    if fecha_inicio: qs = qs.filter(fecha_ingreso__gte=fecha_inicio)
-    if fecha_fin:    qs = qs.filter(fecha_ingreso__lte=fecha_fin)
+    qs = filtrar_por_rango(Solicitud.objects.all(), 'fecha_ingreso', fecha_inicio, fecha_fin)
 
     tiempos_por_tipo = {}
     for t, label in Solicitud.TIPOS_REP:
@@ -1432,7 +1346,7 @@ def reporte_tiempos_pdf(request):
 
     story = [
         Paragraph('TechRepair — Reporte de Tiempos de Reparación', titulo_s),
-        Paragraph(f'Generado el {datetime.date.today().strftime("%d/%m/%Y")}{periodo}', subtit_s),
+        Paragraph(f'Generado el {timezone.localdate().strftime("%d/%m/%Y")}{periodo}', subtit_s),
         Spacer(1, 0.4*cm),
         Paragraph('RESUMEN GENERAL', seccion_s),
         tabla([['Total solicitudes', 'Promedio general', 'Total horas acum.'],
@@ -1454,7 +1368,7 @@ def reporte_tiempos_pdf(request):
 
 
 # ── PDF REPORTE INGRESOS ───────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def reporte_ingresos_pdf(request):
     if request.user.rol != 'admin':
         return redirect('dashboard')
@@ -1464,24 +1378,14 @@ def reporte_ingresos_pdf(request):
     from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib.units import cm
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
-    from django.http import HttpResponse
     import io
 
-    fecha_inicio_str = request.GET.get('fecha_inicio', '')
-    fecha_fin_str    = request.GET.get('fecha_fin', '')
-    fecha_inicio = fecha_fin = None
-    if fecha_inicio_str:
-        try: fecha_inicio = datetime.date.fromisoformat(fecha_inicio_str)
-        except ValueError: pass
-    if fecha_fin_str:
-        try: fecha_fin = datetime.date.fromisoformat(fecha_fin_str)
-        except ValueError: pass
+    fecha_inicio, fecha_fin, fecha_inicio_str, fecha_fin_str, error_fecha = parsear_rango_fechas(request)
 
     costos_qs = Costo.objects.select_related(
         'solicitud__cliente', 'solicitud__equipo', 'solicitud__detalle__tecnico'
     ).all()
-    if fecha_inicio: costos_qs = costos_qs.filter(solicitud__fecha_ingreso__gte=fecha_inicio)
-    if fecha_fin:    costos_qs = costos_qs.filter(solicitud__fecha_ingreso__lte=fecha_fin)
+    costos_qs = filtrar_por_rango(costos_qs, 'solicitud__fecha_ingreso', fecha_inicio, fecha_fin)
 
     total_ingresos  = sum(c.total     for c in costos_qs)
     total_mano_obra = sum(c.mano_obra for c in costos_qs)
@@ -1541,7 +1445,7 @@ def reporte_ingresos_pdf(request):
 
     story = [
         Paragraph('TechRepair — Reporte de Ingresos', titulo_s),
-        Paragraph(f'Generado el {datetime.date.today().strftime("%d/%m/%Y")}{periodo}', subtit_s),
+        Paragraph(f'Generado el {timezone.localdate().strftime("%d/%m/%Y")}{periodo}', subtit_s),
         Spacer(1, 0.4*cm),
         Paragraph('RESUMEN DE INGRESOS', seccion_s),
         tabla([
@@ -1580,9 +1484,7 @@ def reporte_ingresos_pdf(request):
 
 
     # ── API: EQUIPOS POR CLIENTE ───────────────────────────────────
-from django.http import JsonResponse
-
-@login_required(login_url='login')
+@login_required
 def equipos_por_cliente(request, cliente_id):
     equipos = Equipo.objects.filter(cliente_id=cliente_id).values(
         'id', 'tipo', 'marca', 'modelo', 'serie'
@@ -1598,18 +1500,12 @@ def equipos_por_cliente(request, cliente_id):
     return JsonResponse({'equipos': data})
 
 
-    import datetime
-from django.http import HttpResponse
-
-
 # ── SEGUIMIENTO PÚBLICO ────────────────────────────────────────
-def seguimiento(request, pk):
-    try:
-        solicitud = Solicitud.objects.select_related(
-            'cliente', 'equipo', 'detalle__tecnico'
-        ).get(pk=pk)
-    except Solicitud.DoesNotExist:
-        return render(request, 'core/solicitudes/seguimiento.html', {'no_encontrado': True})
+def seguimiento(request, token):
+    solicitud = get_object_or_404(
+        Solicitud.objects.select_related('cliente', 'equipo', 'detalle__tecnico'),
+        token_seguimiento=token
+    )
 
     avances = solicitud.avances.select_related('usuario').all()
 
@@ -1642,7 +1538,7 @@ def seguimiento(request, pk):
 
 
 # ── ENTREGA DE EQUIPO ──────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def entrega(request, pk):
     solicitud = get_object_or_404(
         Solicitud.objects.select_related('cliente', 'equipo', 'detalle__tecnico'),
@@ -1650,7 +1546,7 @@ def entrega(request, pk):
     )
     try:
         costo = solicitud.costo
-    except:
+    except Costo.DoesNotExist:
         costo = None
     repuestos = solicitud.repuestos.all()
 
@@ -1663,8 +1559,8 @@ def entrega(request, pk):
             return redirect('detalle_solicitud', pk=pk)
         confirmacion = request.POST.get('confirmacion') == 'on'
         observaciones = request.POST.get('observaciones', '')
-        solicitud.fecha_entrega         = datetime.date.today()
-        solicitud.hora_entrega          = datetime.datetime.now().time()
+        solicitud.fecha_entrega         = timezone.localdate()
+        solicitud.hora_entrega          = timezone.localtime().time()
         solicitud.confirmacion_cliente  = confirmacion
         solicitud.observaciones_entrega = observaciones
         solicitud.estado                = 'entregado'
@@ -1683,13 +1579,13 @@ def entrega(request, pk):
         'solicitud': solicitud,
         'costo':     costo,
         'repuestos': repuestos,
-        'hoy':       datetime.date.today(),
-        'ahora':     datetime.datetime.now().strftime('%H:%M'),
+        'hoy':       timezone.localdate(),
+        'ahora':     timezone.localtime().strftime('%H:%M'),
     })
 
 
 # ── INFORME PDF ────────────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def informe_pdf(request, pk):
     from reportlab.lib.pagesizes import A4
     from reportlab.lib import colors
@@ -1706,13 +1602,9 @@ def informe_pdf(request, pk):
 
     try:
         costo = solicitud.costo
-    except:
+    except Costo.DoesNotExist:
         costo = None
-
-    try:
-        detalle = solicitud.detalle
-    except:
-        detalle = None
+    detalle = getattr(solicitud, 'detalle', None)
 
     repuestos = solicitud.repuestos.all()
 
@@ -1767,7 +1659,7 @@ def informe_pdf(request, pk):
 
     fecha_entrega_str = (solicitud.fecha_entrega.strftime('%d/%m/%Y')
                          if solicitud.fecha_entrega
-                         else datetime.date.today().strftime('%d/%m/%Y'))
+                         else timezone.localdate().strftime('%d/%m/%Y'))
 
     datos = Table([
         [campo('Cliente', solicitud.cliente.nombre),
@@ -1873,7 +1765,7 @@ def informe_pdf(request, pk):
     return response
 
     # ── ELIMINAR SOLICITUD ─────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def eliminar_solicitud(request, pk):
     if request.user.rol != 'admin':
         return redirect('consultar_solicitudes')
@@ -1888,7 +1780,8 @@ def eliminar_solicitud(request, pk):
     return render(request, 'core/solicitudes/eliminar.html', {'solicitud': solicitud})
     
     # ── MARCAR COMO PRIORITARIA ────────────────────────────────────
-@login_required(login_url='login')
+@require_POST
+@login_required
 def marcar_prioritaria(request, pk):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('consultar_solicitudes')
@@ -1903,7 +1796,8 @@ def marcar_prioritaria(request, pk):
 
 
 # ── QUITAR PRIORIDAD ───────────────────────────────────────────
-@login_required(login_url='login')
+@require_POST
+@login_required
 def quitar_prioritaria(request, pk):
     if request.user.rol not in ['admin', 'recep']:
         return redirect('consultar_solicitudes')
@@ -1917,7 +1811,7 @@ def quitar_prioritaria(request, pk):
 
 
 # ── REASIGNAR TÉCNICO ──────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def reasignar_tecnico(request, pk):
     solicitud = get_object_or_404(Solicitud, pk=pk)
     detalle, _ = DetalleSolicitud.objects.get_or_create(solicitud=solicitud)
@@ -1950,9 +1844,8 @@ def reasignar_tecnico(request, pk):
     })
 
     # ── HISTORIAL DEL CLIENTE ──────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def historial_cliente(request, pk):
-    from django.shortcuts import get_object_or_404
     cliente    = get_object_or_404(Cliente, pk=pk)
     solicitudes = Solicitud.objects.filter(
         cliente=cliente
@@ -1963,9 +1856,8 @@ def historial_cliente(request, pk):
     })
 
     # ── HISTORIAL DEL EQUIPO ───────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def historial_equipo(request, pk):
-    from django.shortcuts import get_object_or_404
     equipo      = get_object_or_404(Equipo, pk=pk)
     solicitudes = Solicitud.objects.filter(
         equipo=equipo
@@ -1976,18 +1868,19 @@ def historial_equipo(request, pk):
     })
 
     # ── ACTUALIZAR EQUIPO ──────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def actualizar_equipo(request, pk):
     if request.user.rol == 'tec':
         return redirect('dashboard')
     equipo = get_object_or_404(Equipo.objects.select_related('cliente'), pk=pk)
-    CAMPOS_IDENTIDAD = ['tipo', 'tipo_personalizado', 'marca', 'marca_personalizada', 'modelo', 'serie']
     if request.method == 'POST':
         form = EquipoUpdateForm(request.POST, instance=equipo)
         if form.is_valid():
             if request.user.rol != 'admin':
-                for campo in CAMPOS_IDENTIDAD:
-                    form.cleaned_data[campo] = getattr(equipo, campo)
+                campos_identidad = ['tipo', 'marca', 'modelo', 'serie']
+                equipo_actual = Equipo.objects.get(pk=pk)
+                for campo in campos_identidad:
+                    setattr(form.instance, campo, getattr(equipo_actual, campo))
             form.save()
             messages.success(request, 'Equipo actualizado correctamente.')
             return redirect('consultar_equipos')
@@ -1999,7 +1892,7 @@ def actualizar_equipo(request, pk):
     })
 
     # ── ELIMINAR CLIENTE ────────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def eliminar_cliente(request, pk):
     if request.user.rol != 'admin':
         messages.error(request, 'Solo el administrador puede eliminar clientes.')
@@ -2021,7 +1914,7 @@ def eliminar_cliente(request, pk):
 
 
 # ── ELIMINAR EQUIPO ─────────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def eliminar_equipo(request, pk):
     if request.user.rol != 'admin':
         messages.error(request, 'Solo el administrador puede eliminar equipos.')
@@ -2042,9 +1935,8 @@ def eliminar_equipo(request, pk):
     return render(request, 'core/equipos/eliminar.html', {'equipo': equipo})
 
   # ── AMPLIACIÓN DE TIEMPO ────────────────────────────────────────
-@login_required(login_url='login')
+@login_required
 def solicitar_ampliacion(request, pk):
-    from decimal import Decimal
     solicitud = get_object_or_404(Solicitud, pk=pk)
 
     if request.user.rol == 'tec':

@@ -160,6 +160,20 @@
           </div>
         </div>
         <div class="di"><div class="dl">Fecha ingreso</div><div class="dv">{{ solicitud.fecha_ingreso }}</div></div>
+        {% if solicitud.costo %}
+        <div class="di">
+          <div class="dl">💰 Precio total</div>
+          <div class="dv">
+            <span style="font-family:'JetBrains Mono',monospace;font-weight:700;
+              font-size:1.05rem;color:var(--success);">
+              S/. {{ solicitud.costo.total|floatformat:2 }}
+            </span>
+            <span style="font-size:.72rem;color:var(--t3);margin-left:8px;">
+              (M.O.: S/. {{ solicitud.costo.mano_obra|floatformat:2 }})
+            </span>
+          </div>
+        </div>
+        {% endif %}
       </div>
     </div>
 

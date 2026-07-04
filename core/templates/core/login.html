@@ -54,6 +54,15 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--t1);
     <p>Sistema de Gestión de Reparaciones</p>
   </div>
 
+  {% if messages %}
+  {% for msg in messages %}
+  <div class="error" style="{% if msg.tags == 'warning' %}background:rgba(245,166,35,.1);border-color:rgba(245,166,35,.3);color:#f5a623;{% endif %}">
+    <i class="bi bi-{% if msg.tags == 'warning' %}clock-history{% else %}exclamation-triangle-fill{% endif %}"></i>
+    {{ msg }}
+  </div>
+  {% endfor %}
+  {% endif %}
+
   {% if error %}
   <div class="error"><i class="bi bi-exclamation-triangle-fill"></i>{{ error }}</div>
   {% endif %}

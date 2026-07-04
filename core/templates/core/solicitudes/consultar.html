@@ -144,17 +144,23 @@
             {% if request.user.rol == 'admin' or request.user.rol == 'recep' %}
               {% if sol.estado != 'finalizado' and sol.estado != 'entregado' %}
                 {% if sol.es_prioritaria %}
-                <a href="{% url 'quitar_prioritaria' sol.pk %}"
-                  onclick="return confirm('¿Quitar la prioridad alta y restaurar la prioridad anterior?')"
-                  class="btn btn-o btn-sm" title="Quitar prioritaria" style="color:var(--danger);">
-                  <i class="bi bi-exclamation-triangle"></i>
-                </a>
+                <form method="post" action="{% url 'quitar_prioritaria' sol.pk %}" style="display:inline;"
+                  onsubmit="return confirm('¿Quitar la prioridad y restaurar la anterior?')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-o btn-sm" title="Quitar prioritaria"
+                    style="color:var(--danger);">
+                    <i class="bi bi-exclamation-triangle"></i>
+                  </button>
+                </form>
                 {% else %}
-                <a href="{% url 'marcar_prioritaria' sol.pk %}"
-                  onclick="return confirm('¿Marcar esta solicitud como prioritaria?')"
-                  class="btn btn-o btn-sm" title="Marcar prioritaria" style="color:var(--warn);">
-                  <i class="bi bi-exclamation-triangle-fill"></i>
-                </a>
+                <form method="post" action="{% url 'marcar_prioritaria' sol.pk %}" style="display:inline;"
+                  onsubmit="return confirm('¿Marcar como prioritaria?')">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-o btn-sm" title="Marcar prioritaria"
+                    style="color:var(--warn);">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                  </button>
+                </form>
                 {% endif %}
               {% endif %}
             {% endif %}

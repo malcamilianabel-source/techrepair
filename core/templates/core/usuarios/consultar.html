@@ -49,52 +49,45 @@
 </form>
 
 <!-- TABLA -->
-<div class="card">
-  <div class="tw">
-    <table>
+<div class="card" style="overflow:hidden;">
+  <div style="display:flex;justify-content:space-between;align-items:center;
+              padding:10px 16px;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--t3);">
+    <span>{{ page_obj.paginator.count }} resultado(s) — página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+    <span style="font-size:.75rem;">20 por página</span>
+  </div>
+  <div style="max-height:62vh;overflow-y:auto;overflow-x:auto;">
+    <table style="min-width:700px;">
       <thead>
-        <tr>
-          <th>Usuario</th>
-          <th>Nombre completo</th>
-          <th>Correo</th>
-          <th style="text-align:center;">Rol</th>
-          <th style="text-align:center;">Especialidad</th>
-          <th style="text-align:center;">Estado</th>
-          <th style="text-align:center;">Acciones</th>
+        <tr style="position:sticky;top:0;z-index:2;">
+          <th style="background:var(--surface2,var(--surface));">Usuario</th>
+          <th style="background:var(--surface2,var(--surface));">Nombre completo</th>
+          <th style="background:var(--surface2,var(--surface));">Correo</th>
+          <th style="background:var(--surface2,var(--surface));text-align:center;">Rol</th>
+          <th style="background:var(--surface2,var(--surface));text-align:center;">Especialidad</th>
+          <th style="background:var(--surface2,var(--surface));text-align:center;">Estado</th>
+          <th style="background:var(--surface2,var(--surface));text-align:center;">Acciones</th>
         </tr>
       </thead>
       <tbody>
         {% for u in usuarios %}
         <tr>
-          <td>
-            <span class="mono acc" style="font-weight:600;">@{{ u.username }}</span>
-          </td>
+          <td><span class="mono acc" style="font-weight:600;">@{{ u.username }}</span></td>
           <td><strong>{{ u.get_full_name|default:"—" }}</strong></td>
           <td style="color:var(--t2);font-size:.82rem;">{{ u.email|default:"—" }}</td>
           <td style="text-align:center;">
-            {% if u.rol == 'admin' %}
-              <span class="badge bh">Admin</span>
-            {% elif u.rol == 'tec' %}
-              <span class="badge bm">Técnico</span>
-            {% elif u.rol == 'recep' %}
-              <span class="badge bl">Recepcionista</span>
-            {% else %}
-              <span style="color:var(--t3);">—</span>
-            {% endif %}
+            {% if u.rol == 'admin' %}<span class="badge bh">Admin</span>
+            {% elif u.rol == 'tec' %}<span class="badge bm">Técnico</span>
+            {% elif u.rol == 'recep' %}<span class="badge bl">Recepcionista</span>
+            {% else %}<span style="color:var(--t3);">—</span>{% endif %}
           </td>
-          <td style="text-align:center;color:var(--t2);font-size:.82rem;">
-            {{ u.get_especialidad_display|default:"—" }}
-          </td>
+          <td style="text-align:center;color:var(--t2);font-size:.82rem;">{{ u.get_especialidad_display|default:"—" }}</td>
           <td style="text-align:center;">
-            {% if u.is_active %}
-              <span style="color:var(--success);font-size:.8rem;">&#9679; Activo</span>
-            {% else %}
-              <span style="color:var(--danger);font-size:.8rem;">&#9679; Inactivo</span>
-            {% endif %}
+            {% if u.is_active %}<span style="color:var(--success);font-size:.8rem;">&#9679; Activo</span>
+            {% else %}<span style="color:var(--danger);font-size:.8rem;">&#9679; Inactivo</span>{% endif %}
           </td>
           <td style="text-align:center;">
             <form method="POST" action="{% url 'eliminar_usuario' u.pk %}"
-              onsubmit="return confirm('¿Seguro que deseas eliminar al usuario \'{{ u.get_full_name|default:u.username }}\'? Esta acción no se puede deshacer.');"
+              onsubmit="return confirm('¿Seguro que deseas eliminar al usuario \'{{ u.get_full_name|default:u.username }}\'?');"
               style="display:inline;">
               {% csrf_token %}
               <button type="submit" class="btn btn-o" style="padding:4px 10px;color:var(--danger);border-color:rgba(239,68,68,.3);">
@@ -107,16 +100,37 @@
         <tr>
           <td colspan="7" style="text-align:center;padding:30px;color:var(--t3);">
             <i class="bi bi-person-slash" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
-            {% if query %}
-              No se encontraron usuarios con "{{ query }}"
-            {% else %}
-              No hay usuarios registrados aún.
-            {% endif %}
+            {% if query %}No se encontraron usuarios con "{{ query }}"
+            {% else %}No hay usuarios registrados aún.{% endif %}
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div style="display:flex;justify-content:center;align-items:center;gap:6px;
+              padding:12px 16px;border-top:1px solid var(--border);flex-wrap:wrap;">
+    {% if page_obj.has_previous %}
+    <a href="?q={{ query }}&page=1" class="btn btn-o btn-sm">«</a>
+    <a href="?q={{ query }}&page={{ page_obj.previous_page_number }}" class="btn btn-o btn-sm">‹</a>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}
+        <span class="btn btn-p btn-sm" style="min-width:32px;text-align:center;">{{ num }}</span>
+      {% elif num >= page_obj.number|add:"-3" and num <= page_obj.number|add:"3" %}
+        <a href="?q={{ query }}&page={{ num }}" class="btn btn-o btn-sm" style="min-width:32px;text-align:center;">{{ num }}</a>
+      {% elif num == 1 or num == page_obj.paginator.num_pages %}
+        <a href="?q={{ query }}&page={{ num }}" class="btn btn-o btn-sm" style="min-width:32px;text-align:center;">{{ num }}</a>
+      {% elif num == page_obj.number|add:"-4" or num == page_obj.number|add:"4" %}
+        <span style="color:var(--t3);padding:0 4px;">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+    <a href="?q={{ query }}&page={{ page_obj.next_page_number }}" class="btn btn-o btn-sm">›</a>
+    <a href="?q={{ query }}&page={{ page_obj.paginator.num_pages }}" class="btn btn-o btn-sm">»</a>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

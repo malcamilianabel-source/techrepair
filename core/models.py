@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
@@ -41,6 +42,9 @@ class Cliente(models.Model):
     @property
     def nombre_completo(self):
         return f"{self.nombre} {self.apellido}".strip()
+
+    class Meta:
+        ordering = ['-creado_en']
 
     def __str__(self):
         return f"{self.nombre_completo} (DNI: {self.dni})"
@@ -89,6 +93,9 @@ class Equipo(models.Model):
     marca_personalizada = models.CharField(max_length=100, blank=True, default='')
     creado_en  = models.DateTimeField(auto_now_add=True)
 
+    class Meta:
+        ordering = ['-creado_en']
+
     def __str__(self):
         return f"{self.get_tipo_display()} | {self.marca} {self.modelo} — {self.cliente.nombre}"
 
@@ -123,7 +130,7 @@ class Solicitud(models.Model):
     prioridad        = models.CharField(max_length=10, choices=PRIORIDADES,
                                          default='media')
     estado           = models.CharField(max_length=15, choices=ESTADOS,
-                                         default='pendiente')
+                                         default='pendiente', db_index=True)
     es_prioritaria    = models.BooleanField(default=False)
     prioridad_anterior= models.CharField(max_length=10, blank=True, default='')
     fecha_ingreso     = models.DateField(auto_now_add=True)
@@ -137,7 +144,10 @@ class Solicitud(models.Model):
     observaciones_entrega= models.TextField(blank=True, default='')
     confirmacion_cliente = models.BooleanField(default=False)
     creado_en        = models.DateTimeField(auto_now_add=True)
-    
+    token_seguimiento = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+
+    class Meta:
+        ordering = ['-creado_en']
 
     def __str__(self):
         return f"#{self.id} — {self.cliente.nombre} ({self.get_estado_display()})"
@@ -220,10 +230,13 @@ class Costo(models.Model):
 
     def calcular_total(self):
         from decimal import Decimal
-        total_repuestos = sum(r.subtotal for r in
-                              self.solicitud.repuestos.all())
-        self.total = Decimal(str(self.mano_obra)) + Decimal(str(total_repuestos))
-        self.save()
+        from django.db.models import Sum, F
+        agg = self.solicitud.repuestos.aggregate(
+            total_rep=Sum(F('cantidad') * F('precio_unit'))
+        )
+        total_rep = agg['total_rep'] or Decimal('0')
+        self.total = (self.mano_obra or Decimal('0')) + total_rep
+        self.save(update_fields=['total'])
     def __str__(self):
         return f"Costo #{self.solicitud.id} — S/. {self.total}"
 

@@ -42,18 +42,23 @@
 </form>
 
 <!-- TABLA -->
-<div class="card">
-  <div class="tw">
-    <table>
+<div class="card" style="overflow:hidden;">
+  <div style="display:flex;justify-content:space-between;align-items:center;
+              padding:10px 16px;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--t3);">
+    <span>{{ page_obj.paginator.count }} resultado(s) — página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+    <span style="font-size:.75rem;">20 por página</span>
+  </div>
+  <div style="max-height:62vh;overflow-y:auto;overflow-x:auto;">
+    <table style="min-width:700px;">
       <thead>
-        <tr>
-          <th>ID</th>
-          <th>Nombre y Apellido</th>
-          <th>DNI</th>
-          <th>Teléfono</th>
-          <th>Correo</th>
-          <th>Equipos</th>
-          <th>Acciones</th>
+        <tr style="position:sticky;top:0;z-index:2;">
+          <th style="background:var(--surface2,var(--surface));">ID</th>
+          <th style="background:var(--surface2,var(--surface));">Nombre y Apellido</th>
+          <th style="background:var(--surface2,var(--surface));">DNI</th>
+          <th style="background:var(--surface2,var(--surface));">Teléfono</th>
+          <th style="background:var(--surface2,var(--surface));">Correo</th>
+          <th style="background:var(--surface2,var(--surface));">Equipos</th>
+          <th style="background:var(--surface2,var(--surface));">Acciones</th>
         </tr>
       </thead>
       <tbody>
@@ -71,39 +76,51 @@
             </span>
           </td>
           <td style="display:flex;gap:6px;">
-            <a href="{% url 'actualizar_cliente' cliente.pk %}"
-              class="btn btn-o btn-sm">
-              <i class="bi bi-pencil"></i>
-            </a>
-            <a href="{% url 'historial_cliente' cliente.pk %}"
-              class="btn btn-o btn-sm" title="Ver historial">
-              <i class="bi bi-clock-history"></i>
-            </a>
+            <a href="{% url 'actualizar_cliente' cliente.pk %}" class="btn btn-o btn-sm"><i class="bi bi-pencil"></i></a>
+            <a href="{% url 'historial_cliente' cliente.pk %}" class="btn btn-o btn-sm" title="Ver historial"><i class="bi bi-clock-history"></i></a>
             {% if request.user.rol == 'admin' %}
-            <a href="{% url 'eliminar_cliente' cliente.pk %}"
-              class="btn btn-sm"
-              style="background:var(--dg);color:var(--danger);border:1px solid rgba(232,68,90,.3);"
-              title="Eliminar cliente">
+            <a href="{% url 'eliminar_cliente' cliente.pk %}" class="btn btn-sm"
+              style="background:var(--dg);color:var(--danger);border:1px solid rgba(232,68,90,.3);" title="Eliminar">
               <i class="bi bi-trash-fill"></i>
             </a>
             {% endif %}
           </td>
-          
         </tr>
         {% empty %}
         <tr>
           <td colspan="7" style="text-align:center;padding:30px;color:var(--t3);">
             <i class="bi bi-person-slash" style="font-size:2rem;display:block;margin-bottom:8px;"></i>
-            {% if query %}
-              No se encontraron clientes con "{{ query }}"
-            {% else %}
-              No hay clientes registrados aún.
-            {% endif %}
+            {% if query %}No se encontraron clientes con "{{ query }}"
+            {% else %}No hay clientes registrados aún.{% endif %}
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% if page_obj.paginator.num_pages > 1 %}
+  <div style="display:flex;justify-content:center;align-items:center;gap:6px;
+              padding:12px 16px;border-top:1px solid var(--border);flex-wrap:wrap;">
+    {% if page_obj.has_previous %}
+    <a href="?q={{ query }}&page=1" class="btn btn-o btn-sm">«</a>
+    <a href="?q={{ query }}&page={{ page_obj.previous_page_number }}" class="btn btn-o btn-sm">‹</a>
+    {% endif %}
+    {% for num in page_obj.paginator.page_range %}
+      {% if num == page_obj.number %}
+        <span class="btn btn-p btn-sm" style="min-width:32px;text-align:center;">{{ num }}</span>
+      {% elif num >= page_obj.number|add:"-3" and num <= page_obj.number|add:"3" %}
+        <a href="?q={{ query }}&page={{ num }}" class="btn btn-o btn-sm" style="min-width:32px;text-align:center;">{{ num }}</a>
+      {% elif num == 1 or num == page_obj.paginator.num_pages %}
+        <a href="?q={{ query }}&page={{ num }}" class="btn btn-o btn-sm" style="min-width:32px;text-align:center;">{{ num }}</a>
+      {% elif num == page_obj.number|add:"-4" or num == page_obj.number|add:"4" %}
+        <span style="color:var(--t3);padding:0 4px;">…</span>
+      {% endif %}
+    {% endfor %}
+    {% if page_obj.has_next %}
+    <a href="?q={{ query }}&page={{ page_obj.next_page_number }}" class="btn btn-o btn-sm">›</a>
+    <a href="?q={{ query }}&page={{ page_obj.paginator.num_pages }}" class="btn btn-o btn-sm">»</a>
+    {% endif %}
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

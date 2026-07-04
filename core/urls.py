@@ -57,7 +57,7 @@ urlpatterns = [
     path('reportes/ingresos/pdf/', views.reporte_ingresos_pdf, name='reporte_ingresos_pdf'),
 
     # ── SEGUIMIENTO PÚBLICO ──
-    path('seguimiento/<int:pk>/', views.seguimiento, name='seguimiento'),
+    path('seguimiento/<uuid:token>/', views.seguimiento, name='seguimiento'),
 
     # ── AJAX ──
     path('api/equipos/<int:cliente_id>/', views.equipos_por_cliente, name='equipos_por_cliente'),
