@@ -96,11 +96,22 @@ def consultar_solicitudes(request):
         default=3,
         output_field=IntegerField(),
     )
+    # Pendientes sin asignar primero → pendientes con técnico → en proceso → finalizado → entregado
+    orden_urgencia = Case(
+        When(estado='pendiente', detalle__tecnico__isnull=True, then=0),
+        When(estado='pendiente', then=1),
+        When(estado='proceso',    then=2),
+        When(estado='finalizado', then=3),
+        When(estado='entregado',  then=4),
+        default=5,
+        output_field=IntegerField(),
+    )
     solicitudes = Solicitud.objects.select_related(
         'cliente', 'equipo', 'detalle__tecnico'
     ).annotate(
-        _ord=orden_prioridad
-    ).order_by('_ord' if orden == 'desc' else '-_ord', '-creado_en')
+        _ord=orden_prioridad,
+        _urgencia=orden_urgencia,
+    ).order_by('_urgencia', '_ord' if orden == 'desc' else '-_ord', '-creado_en')
 
     if request.user.rol == Usuario.Rol.TECNICO:
         solicitudes = solicitudes.filter(detalle__tecnico=request.user)

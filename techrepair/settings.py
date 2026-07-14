@@ -37,6 +37,11 @@ DEBUG = os.environ.get('DEBUG', 'True') == 'True'
 _allowed = os.environ.get('ALLOWED_HOSTS', '')
 ALLOWED_HOSTS = _allowed.split(',') if _allowed else (['*'] if DEBUG else ['127.0.0.1', 'localhost'])
 
+# Render inyecta esta variable automáticamente con el hostname del servicio
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
+
 
 # Application definition
 
@@ -135,7 +140,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 # CSRF
-CSRF_TRUSTED_ORIGINS = ['https://web-production-1ce30.up.railway.app']
+CSRF_TRUSTED_ORIGINS = [
+    'https://web-production-1ce30.up.railway.app',
+    'https://*.onrender.com',
+]
 
 
 # ── PRODUCCIÓN ────────────────────────────────────────────────────────────────

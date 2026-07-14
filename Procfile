@@ -1,1 +1,1 @@
-web: gunicorn techrepair.wsgi
+web: gunicorn techrepair.wsgi:application
