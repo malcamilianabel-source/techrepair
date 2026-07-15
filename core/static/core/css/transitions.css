@@ -1,0 +1,133 @@
+/* ================================================================
+   TechRepair — Transiciones y animaciones globales
+   ================================================================ */
+
+/* ── 1. FADE-IN de página al cargar ── */
+@keyframes tr-fadein {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.view {
+  animation: tr-fadein .28s ease-out both;
+}
+
+/* ── 2. FADE-OUT al navegar (clase aplicada por JS) ── */
+@keyframes tr-fadeout {
+  from { opacity: 1; transform: translateY(0); }
+  to   { opacity: 0; transform: translateY(-6px); }
+}
+body.tr-leaving .view {
+  animation: tr-fadeout .18s ease-in both;
+}
+
+/* ── 3. CARDS: hover con elevación sutil ── */
+.card {
+  transition: box-shadow .2s, border-color .2s;
+}
+.card:hover {
+  box-shadow: 0 4px 24px rgba(0,0,0,.35);
+  border-color: var(--border2);
+}
+
+/* ── 4. STATS: hover lift ── */
+.stat {
+  transition: transform .18s, box-shadow .18s, border-color .18s;
+}
+.stat:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,.4);
+  border-color: var(--border2);
+}
+
+/* ── 5. BOTONES: efecto ripple ── */
+.btn .tr-ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,.25);
+  transform: scale(0);
+  animation: tr-ripple .5s linear;
+  pointer-events: none;
+}
+@keyframes tr-ripple {
+  to { transform: scale(4); opacity: 0; }
+}
+
+/* ── 6. BOTONES: estado loading (spinner) ── */
+.btn.tr-loading {
+  pointer-events: none;
+  opacity: .75;
+}
+.btn.tr-loading .tr-spinner {
+  display: inline-block;
+  width: 12px; height: 12px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: tr-spin .6s linear infinite;
+  flex-shrink: 0;
+}
+@keyframes tr-spin { to { transform: rotate(360deg); } }
+
+/* ── 7. ALERTAS / MENSAJES: slide-in desde arriba ── */
+@keyframes tr-slidein {
+  from { opacity: 0; transform: translateY(-14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.messages, .alert, [class*="msg-"], .error {
+  animation: tr-slidein .22s ease-out both;
+}
+
+/* ── 8. FILAS DE TABLA: transición más suave ── */
+tbody tr {
+  transition: background .15s, opacity .15s;
+}
+
+/* ── 9. SIDEBAR items: transición más pronunciada ── */
+.sb-item {
+  transition: background .15s, color .15s, border-left-color .15s, padding-left .1s;
+}
+.sb-item:hover {
+  padding-left: 20px;
+}
+.sb-item.on {
+  padding-left: 20px;
+}
+
+/* ── 10. INPUTS: borde animado al hacer focus ── */
+.fc {
+  transition: border-color .18s, box-shadow .18s;
+}
+
+/* ── 11. BADGES: aparición suave ── */
+.badge {
+  transition: opacity .15s, transform .15s;
+}
+
+/* ── 12. LINKS de navegación (override del fade de sidebar) ── */
+.sb-item, .btn, a {
+  transition-property: background, color, border-color, box-shadow, opacity, padding-left;
+  transition-duration: .15s;
+  transition-timing-function: ease;
+}
+
+/* ── 13. MODAL / OVERLAYS: fade + scale ── */
+@keyframes tr-modal-in {
+  from { opacity: 0; transform: scale(.96) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+.modal-box, [class*="confirm-"] {
+  animation: tr-modal-in .22s ease-out both;
+}
+
+/* ── 14. SKELETON LOADER (para tablas con carga async futura) ── */
+@keyframes tr-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+.tr-skeleton {
+  background: linear-gradient(90deg, var(--card) 25%, var(--hover) 50%, var(--card) 75%);
+  background-size: 800px 100%;
+  animation: tr-shimmer 1.4s infinite;
+  border-radius: 4px;
+  height: 14px;
+}

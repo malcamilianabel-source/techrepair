@@ -139,9 +139,11 @@
   </form>
 </div>
 
+{% block extra_css %}
 <style>
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 </style>
+{% endblock %}
 
 {% if not cliente_fijo %}
 <script>

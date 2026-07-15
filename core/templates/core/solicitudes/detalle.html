@@ -394,6 +394,7 @@
   </div><!-- /columna derecha -->
 </div>
 
+{% block extra_css %}
 <style>
 .dg{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .di{background:var(--surface);border:1px solid var(--border);border-radius:var(--rs);padding:11px 14px;}
@@ -414,5 +415,6 @@
 .tl-d{font-size:.79rem;color:var(--t2);margin-top:6px;padding:8px 11px;
   background:var(--surface);border-radius:var(--rs);border-left:2px solid var(--accent);}
 </style>
+{% endblock %}
 
 {% endblock %}

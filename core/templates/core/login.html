@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -6,45 +7,7 @@
 <title>TechRepair — Iniciar Sesión</title>
 <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Sora:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
-<style>
-:root{
-  --bg:#0b0d12;--card:#181c27;--border:#252c3d;
-  --accent:#5b8dee;--ag:rgba(91,141,238,.15);--teal:#00c9a7;
-  --danger:#e8445a;--dg:rgba(232,68,90,.12);
-  --t1:#dde4f5;--t2:#7b87a8;--t3:#454f6b;--rs:6px;
-}
-*{margin:0;padding:0;box-sizing:border-box;}
-body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--t1);
-  min-height:100vh;display:flex;align-items:center;justify-content:center;
-  background-image:radial-gradient(ellipse at 25% 50%,rgba(91,141,238,.06) 0%,transparent 55%),
-                   radial-gradient(ellipse at 75% 20%,rgba(0,201,167,.04) 0%,transparent 50%);}
-.login-card{width:100%;max-width:400px;background:var(--card);
-  border:1px solid var(--border);border-radius:14px;padding:36px;
-  box-shadow:0 24px 60px rgba(0,0,0,.5);}
-.login-logo{text-align:center;margin-bottom:28px;}
-.logo-ic{width:52px;height:52px;background:linear-gradient(135deg,var(--accent),var(--teal));
-  border-radius:12px;display:flex;align-items:center;justify-content:center;
-  font-size:1.5rem;margin:0 auto 10px;}
-.login-logo h1{font-family:'JetBrains Mono',monospace;font-size:1.1rem;color:var(--t1);}
-.login-logo p{font-size:.75rem;color:var(--t3);margin-top:3px;}
-.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:14px;}
-.fl{font-size:.75rem;color:var(--t2);font-weight:500;}
-.fc{background:#11141c;border:1px solid var(--border);border-radius:var(--rs);
-  padding:9px 12px;color:var(--t1);font-size:.84rem;font-family:'Sora',sans-serif;
-  transition:.15s;outline:none;width:100%;}
-.fc:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--ag);}
-.fc::placeholder{color:var(--t3);}
-.btn{display:flex;align-items:center;justify-content:center;gap:6px;
-  width:100%;padding:10px;border-radius:var(--rs);font-size:.88rem;
-  font-weight:600;cursor:pointer;border:none;background:var(--accent);
-  color:#fff;font-family:'Sora',sans-serif;margin-top:6px;transition:.15s;}
-.btn:hover{background:#4a7ce0;}
-.error{background:var(--dg);border:1px solid rgba(232,68,90,.3);color:var(--danger);
-  padding:10px 14px;border-radius:var(--rs);font-size:.8rem;
-  display:flex;align-items:center;gap:8px;margin-bottom:14px;}
-.hint{text-align:center;margin-top:14px;font-size:.73rem;color:var(--t3);}
-.hint span{color:var(--accent);}
-</style>
+<link rel="stylesheet" href="{% static 'core/css/login.css' %}">
 </head>
 <body>
 <div class="login-card">
@@ -108,5 +71,6 @@ body{font-family:'Sora',sans-serif;background:var(--bg);color:var(--t1);
     ¿Olvidaste tu contraseña? <span>Contacta al administrador</span>
   </div>
 </div>
+<script src="{% static 'core/js/transitions.js' %}"></script>
 </body>
 </html>

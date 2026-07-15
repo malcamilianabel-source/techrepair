@@ -87,10 +87,12 @@
   </form>
 </div>
 
+{% block extra_css %}
 <style>
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 .al-i{background:var(--ag);border:1px solid rgba(91,141,238,.3);
   color:var(--accent);padding:10px 14px;border-radius:var(--rs);
   font-size:.82rem;display:flex;align-items:center;gap:8px;}
 </style>
+{% endblock %}
 {% endblock %}

@@ -82,9 +82,11 @@
   </form>
 </div>
 
+{% block extra_css %}
 <style>
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 </style>
+{% endblock %}
 <script>
 document.addEventListener('DOMContentLoaded', function(){
   const soloNumeros = function(e){
