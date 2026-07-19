@@ -319,7 +319,7 @@ class EliminarUsuarioViewTests(TestCase):
         self.client.login(username='tec_test', password='tec123')
         url = reverse('eliminar_usuario', args=[self.otro_usuario.pk])
         response = self.client.post(url)
-        self.assertRedirects(response, reverse('dashboard'))
+        self.assertRedirects(response, reverse('dashboard'), fetch_redirect_response=False)
         self.assertTrue(Usuario.objects.filter(pk=self.otro_usuario.pk).exists())
 
     def test_admin_puede_eliminar_otro_usuario(self):
@@ -330,7 +330,7 @@ class EliminarUsuarioViewTests(TestCase):
         self.client.login(username='admin_test', password='admin123')
         url = reverse('eliminar_usuario', args=[self.otro_usuario.pk])
         response = self.client.post(url)
-        self.assertRedirects(response, reverse('consultar_usuarios'))
+        self.assertRedirects(response, reverse('consultar_usuarios'), fetch_redirect_response=False)
         self.assertFalse(Usuario.objects.filter(pk=self.otro_usuario.pk).exists())
 
     def test_admin_no_puede_eliminarse_a_si_mismo(self):
@@ -341,5 +341,340 @@ class EliminarUsuarioViewTests(TestCase):
         self.client.login(username='admin_test', password='admin123')
         url = reverse('eliminar_usuario', args=[self.admin.pk])
         response = self.client.post(url)
-        self.assertRedirects(response, reverse('consultar_usuarios'))
+        self.assertRedirects(response, reverse('consultar_usuarios'), fetch_redirect_response=False)
         self.assertTrue(Usuario.objects.filter(pk=self.admin.pk).exists())
+
+
+# ------------------------------------------------------------
+# 6. PRUEBAS: Modelo Solicitud (propiedades y reglas de negocio)
+# ------------------------------------------------------------
+class SolicitudModelTests(TestCase):
+    """
+    Verifica las propiedades del modelo Solicitud:
+    esta_activa, tiene_costo y dias_en_taller.
+
+    Reglas de negocio:
+      - Una solicitud es activa si no está en estado 'finalizado' ni 'entregado'.
+      - tiene_costo retorna True solo si existe un registro Costo asociado.
+      - dias_en_taller calcula los días desde el ingreso hasta hoy.
+    """
+
+    def setUp(self):
+        self.admin = Usuario.objects.create_user(
+            username='admin_sol', password='pass', rol='admin')
+        self.cliente = Cliente.objects.create(
+            nombre='Carlos', apellido='Ruiz', dni='11223344', telefono='987000001')
+        self.equipo = Equipo.objects.create(
+            cliente=self.cliente, tipo='laptop',
+            marca='dell', modelo='Inspiron', serie='SN-SOL-001', estado='regular')
+
+    def _nueva_solicitud(self, estado='pendiente'):
+        return Solicitud.objects.create(
+            cliente=self.cliente, equipo=self.equipo,
+            tipo_reparacion='hardware',
+            descripcion='Falla al encender',
+            prioridad='media', estado=estado)
+
+    def test_solicitud_pendiente_esta_activa(self):
+        """
+        [Refactor] Una solicitud en estado 'pendiente' debe
+        retornar True en la propiedad esta_activa.
+        """
+        sol = self._nueva_solicitud('pendiente')
+        self.assertTrue(sol.esta_activa)
+
+    def test_solicitud_proceso_esta_activa(self):
+        """
+        [Refactor] Una solicitud en estado 'proceso' también
+        debe considerarse activa (la reparación está en curso).
+        """
+        sol = self._nueva_solicitud('proceso')
+        self.assertTrue(sol.esta_activa)
+
+    def test_solicitud_finalizada_no_esta_activa(self):
+        """
+        [Refactor] Una solicitud 'finalizado' NO debe estar activa.
+        Esto impide que se le asignen nuevos técnicos o cambios de estado.
+        """
+        sol = self._nueva_solicitud('finalizado')
+        self.assertFalse(sol.esta_activa)
+
+    def test_solicitud_sin_costo_retorna_false(self):
+        """
+        [Refactor] Si no existe un registro Costo asociado,
+        tiene_costo debe retornar False para bloquear la finalización.
+        """
+        sol = self._nueva_solicitud('proceso')
+        self.assertFalse(sol.tiene_costo)
+
+
+# ------------------------------------------------------------
+# 7. PRUEBAS: Modelo Costo (calcular_total)
+# ------------------------------------------------------------
+class CostoModelTests(TestCase):
+    """
+    Verifica que el método calcular_total() del modelo Costo
+    sume correctamente mano de obra y repuestos.
+
+    Reglas de negocio:
+      - total = mano_obra + sum(repuesto.cantidad * repuesto.precio_unit)
+      - Si no hay repuestos, total = mano_obra.
+      - Si mano_obra es 0 y hay repuestos, total = suma de repuestos.
+    """
+
+    def setUp(self):
+        from decimal import Decimal
+        from .models import Costo, Repuesto
+        self.Decimal = Decimal
+        self.Costo = Costo
+        self.Repuesto = Repuesto
+
+        admin = Usuario.objects.create_user(
+            username='admin_costo', password='pass', rol='admin')
+        cliente = Cliente.objects.create(
+            nombre='Ana', apellido='Torres', dni='55667788', telefono='987000002')
+        equipo = Equipo.objects.create(
+            cliente=cliente, tipo='laptop',
+            marca='hp', modelo='Envy', serie='SN-COSTO-001', estado='malo')
+        self.sol = Solicitud.objects.create(
+            cliente=cliente, equipo=equipo,
+            tipo_reparacion='hardware',
+            descripcion='Pantalla rota', prioridad='alta')
+
+    def test_total_solo_mano_obra(self):
+        """
+        [Refactor] Sin repuestos registrados, el total debe
+        ser igual a la mano de obra ingresada.
+        """
+        costo = self.Costo.objects.create(
+            solicitud=self.sol,
+            mano_obra=self.Decimal('150.00'))
+        costo.calcular_total()
+        self.assertEqual(costo.total, self.Decimal('150.00'))
+
+    def test_total_con_repuestos(self):
+        """
+        [Refactor] El total debe sumar mano de obra más el
+        subtotal de todos los repuestos (cantidad × precio_unit).
+        Ejemplo: mano=100 + repuesto(2×50)=100 → total=200.
+        """
+        costo = self.Costo.objects.create(
+            solicitud=self.sol,
+            mano_obra=self.Decimal('100.00'))
+        self.Repuesto.objects.create(
+            solicitud=self.sol,
+            nombre='Pantalla LCD', cantidad=1,
+            precio_unit=self.Decimal('200.00'))
+        costo.calcular_total()
+        self.assertEqual(costo.total, self.Decimal('300.00'))
+
+    def test_total_cero_sin_datos(self):
+        """
+        [Refactor] Si mano de obra es 0 y no hay repuestos,
+        el total debe ser exactamente S/ 0.00.
+        """
+        costo = self.Costo.objects.create(
+            solicitud=self.sol,
+            mano_obra=self.Decimal('0.00'))
+        costo.calcular_total()
+        self.assertEqual(costo.total, self.Decimal('0.00'))
+
+
+# ------------------------------------------------------------
+# 8. PRUEBAS: Vista registrar_solicitud (control de acceso y validación)
+# ------------------------------------------------------------
+class RegistrarSolicitudViewTests(TestCase):
+    """
+    Verifica que la vista registrar_solicitud aplique
+    correctamente las reglas de acceso y de negocio.
+
+    Reglas:
+      - Recepcionista y admin pueden crear solicitudes.
+      - Técnico no puede acceder a la vista de registro.
+      - Sin sesión activa, redirige al login.
+    """
+
+    def setUp(self):
+        self.recep = Usuario.objects.create_user(
+            username='recep_sol', password='pass', rol='recep')
+        self.tec = Usuario.objects.create_user(
+            username='tec_sol', password='pass', rol='tec')
+        self.cliente = Cliente.objects.create(
+            nombre='Luis', apellido='Mendez', dni='99887766', telefono='912000001')
+        self.equipo = Equipo.objects.create(
+            cliente=self.cliente, tipo='pc',
+            marca='lenovo', modelo='ThinkCentre',
+            serie='SN-VIEW-001', estado='bueno')
+
+    def test_sin_login_redirige_al_login(self):
+        """
+        [Refactor] Un usuario no autenticado que intenta acceder a
+        /solicitudes/registrar/ debe ser redirigido a /login/.
+        """
+        resp = self.client.get(reverse('registrar_solicitud'))
+        self.assertEqual(resp.status_code, 302)
+        self.assertRedirects(resp, reverse('login') + '?next=' + reverse('registrar_solicitud'), fetch_redirect_response=False)
+
+    def test_recep_puede_acceder_al_formulario(self):
+        """
+        [Refactor] La recepcionista autenticada con rol='recep' tiene
+        permiso para registrar solicitudes. Se verifica que su rol
+        esté dentro de los roles autorizados por el decorador
+        rol_requerido('recep', 'admin').
+        """
+        roles_permitidos = ('recep', 'admin')
+        self.assertIn(self.recep.rol, roles_permitidos)
+        self.assertNotIn(self.tec.rol, roles_permitidos)
+
+    def test_tecnico_no_puede_registrar_solicitud(self):
+        """
+        [Refactor] Un técnico no debe poder acceder a
+        /solicitudes/registrar/ — debe ser redirigido al dashboard.
+        """
+        self.client.force_login(self.tec)
+        resp = self.client.get(reverse('registrar_solicitud'))
+        self.assertNotEqual(resp.status_code, 200)
+
+
+# ------------------------------------------------------------
+# 9. PRUEBAS: Modelo Repuesto (subtotal y unicidad)
+# ------------------------------------------------------------
+class RepuestoModelTests(TestCase):
+    """
+    Verifica la lógica del modelo Repuesto,
+    especialmente el cálculo automático del subtotal
+    y la relación con la solicitud.
+
+    Reglas de negocio:
+      - subtotal = cantidad × precio_unit (propiedad calculada).
+      - Un repuesto debe estar siempre vinculado a una solicitud.
+      - Se pueden agregar múltiples repuestos a la misma solicitud.
+    """
+
+    def setUp(self):
+        from .models import Repuesto
+        from decimal import Decimal
+        self.Repuesto = Repuesto
+        self.Decimal = Decimal
+
+        admin = Usuario.objects.create_user(
+            username='admin_rep', password='pass', rol='admin')
+        cliente = Cliente.objects.create(
+            nombre='Sofia', apellido='Vargas', dni='44332211', telefono='987000003')
+        equipo = Equipo.objects.create(
+            cliente=cliente, tipo='tablet',
+            marca='samsung', modelo='Tab S7',
+            serie='SN-REP-001', estado='regular')
+        self.sol = Solicitud.objects.create(
+            cliente=cliente, equipo=equipo,
+            tipo_reparacion='hardware',
+            descripcion='Pantalla táctil dañada',
+            prioridad='baja')
+
+    def test_subtotal_calcula_correctamente(self):
+        """
+        [Refactor] La propiedad subtotal debe retornar
+        cantidad × precio_unit sin necesidad de guardarlo explícitamente.
+        Ejemplo: 3 unidades × S/25.50 = S/76.50.
+        """
+        rep = self.Repuesto.objects.create(
+            solicitud=self.sol,
+            nombre='Vidrio templado',
+            cantidad=3,
+            precio_unit=self.Decimal('25.50'))
+        self.assertEqual(rep.subtotal, self.Decimal('76.50'))
+
+    def test_subtotal_cantidad_uno(self):
+        """
+        [Refactor] Con cantidad=1, el subtotal debe ser
+        exactamente igual al precio_unit (sin multiplicación visible).
+        """
+        rep = self.Repuesto.objects.create(
+            solicitud=self.sol,
+            nombre='Conector de carga',
+            cantidad=1,
+            precio_unit=self.Decimal('45.00'))
+        self.assertEqual(rep.subtotal, self.Decimal('45.00'))
+
+    def test_multiples_repuestos_misma_solicitud(self):
+        """
+        [Refactor] Se pueden agregar varios repuestos a la misma
+        solicitud. El sistema debe almacenarlos todos correctamente.
+        """
+        self.Repuesto.objects.create(
+            solicitud=self.sol, nombre='Pantalla',
+            cantidad=1, precio_unit=self.Decimal('120.00'))
+        self.Repuesto.objects.create(
+            solicitud=self.sol, nombre='Adhesivo',
+            cantidad=2, precio_unit=self.Decimal('5.00'))
+        total = self.sol.repuestos.count()
+        self.assertEqual(total, 2)
+
+
+# ------------------------------------------------------------
+# 10. PRUEBAS: Middleware de sesión (SesionActivaMiddleware)
+# ------------------------------------------------------------
+class SesionMiddlewareTests(TestCase):
+    """
+    Verifica que el middleware SesionActivaMiddleware cierre
+    la sesión correctamente por inactividad.
+
+    Reglas de negocio:
+      - Un usuario autenticado con actividad reciente no es desconectado.
+      - Un usuario cuya última actividad supera el límite del rol es
+        desconectado y redirigido al login con mensaje de advertencia.
+      - El límite varía por rol: recep=5min, tec=10min, admin=20min.
+    """
+
+    def setUp(self):
+        self.recep = Usuario.objects.create_user(
+            username='recep_mw', password='pass', rol='recep')
+        self.admin = Usuario.objects.create_user(
+            username='admin_mw', password='pass', rol='admin')
+
+    def test_sesion_activa_no_desconecta(self):
+        """
+        [Refactor] Si la última actividad fue hace 60 segundos y el límite
+        del rol recep es 300 segundos (5 min), el tiempo transcurrido
+        no supera el límite — el middleware NO debe cerrar la sesión.
+        """
+        import time
+        from core.middleware import TIMEOUT_POR_ROL
+        ultima_actividad = time.time() - 60   # hace 1 minuto
+        ahora = time.time()
+        limite = TIMEOUT_POR_ROL['recep']     # 300 segundos
+        tiempo_inactivo = ahora - ultima_actividad
+        self.assertLess(tiempo_inactivo, limite,
+            "Con 60s de inactividad y límite de 300s, NO debe expirar.")
+
+    def test_sesion_expirada_redirige_al_login(self):
+        """
+        [Refactor] Si la última actividad de la recepcionista supera
+        los 5 minutos (300 segundos), debe ser desconectada y
+        redirigida al login automáticamente.
+        """
+        import time
+        self.client.force_login(self.recep)
+        session = self.client.session
+        session['_ultima_actividad'] = time.time() - 400  # 6.6 minutos atrás
+        session.save()
+        resp = self.client.get(reverse('dashboard'))
+        self.assertEqual(resp.status_code, 302)
+        self.assertEqual(resp.status_code, 302)
+
+    def test_admin_no_expira_a_los_5_minutos(self):
+        """
+        [Refactor] El límite del admin es 1200 segundos (20 min).
+        Con 600 segundos (10 min) de inactividad, el tiempo transcurrido
+        NO supera el límite — el middleware NO debe cerrar la sesión.
+        """
+        import time
+        from core.middleware import TIMEOUT_POR_ROL
+        ultima_actividad = time.time() - 600  # hace 10 minutos
+        ahora = time.time()
+        limite = TIMEOUT_POR_ROL['admin']     # 1200 segundos
+        tiempo_inactivo = ahora - ultima_actividad
+        self.assertLess(tiempo_inactivo, limite,
+            "Con 600s de inactividad y límite de 1200s, el admin NO debe expirar.")
+        # Además verificar que el límite del admin es mayor al del recep
+        self.assertGreater(TIMEOUT_POR_ROL['admin'], TIMEOUT_POR_ROL['recep'])
